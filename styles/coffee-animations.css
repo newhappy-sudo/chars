@@ -1,0 +1,149 @@
+/* styles/coffee-animations.css */
+
+/* Phone Float Animation */
+@keyframes phoneFloat {
+  0%, 100% {
+    transform: rotateY(-15deg) rotateX(5deg) translateY(0);
+  }
+  50% {
+    transform: rotateY(-15deg) rotateX(5deg) translateY(-20px);
+  }
+}
+
+/* Coffee Icon Bounce */
+@keyframes bounce {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+/* Coffee Cup Float */
+@keyframes cupFloat {
+  0%, 100% {
+    transform: translateY(0) rotate(-5deg);
+  }
+  50% {
+    transform: translateY(-15px) rotate(-5deg);
+  }
+}
+
+/* Steam Animation */
+@keyframes steam {
+  0% {
+    transform: translateY(0) translateX(0) scaleX(1);
+    opacity: 0;
+  }
+  50% {
+    opacity: 0.8;
+  }
+  100% {
+    transform: translateY(-30px) translateX(10px) scaleX(2);
+    opacity: 0;
+  }
+}
+
+/* Apply animations via classes */
+.phone-mockup {
+  animation: phoneFloat 6s ease-in-out infinite;
+}
+
+.coffee-icon {
+  animation: bounce 2s ease-in-out infinite;
+}
+
+.coffee-cup {
+  animation: cupFloat 7s ease-in-out infinite;
+}
+
+.steam span {
+  animation: steam 3s ease-in-out infinite;
+}
+
+.steam span:nth-child(1) {
+  animation-delay: 0s;
+}
+
+.steam span:nth-child(2) {
+  animation-delay: 0.5s;
+}
+
+.steam span:nth-child(3) {
+  animation-delay: 1s;
+}
+
+/* Cup body with pseudo-element for coffee */
+.cup-body::before {
+  content: '';
+  position: absolute;
+  top: 20px;
+  left: 10px;
+  right: 10px;
+  height: 100px;
+  background: linear-gradient(180deg, #6F4E37 0%, #4A3428 100%);
+  border-radius: 0 0 60px 60px;
+}
+
+/* Coffee surface */
+.cup-body::after {
+  content: '';
+  position: absolute;
+  top: 15px;
+  left: 15px;
+  right: 15px;
+  height: 8px;
+  background: rgba(111, 78, 55, 0.8);
+  border-radius: 50%;
+}
+
+/* Phone notch */
+.phone-mockup::before {
+  content: '';
+  position: absolute;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 60px;
+  height: 5px;
+  background: #333;
+  border-radius: 10px;
+  z-index: 10;
+}
+
+/* Responsive adjustments */
+@media (max-width: 968px) {
+  .hero-container {
+    grid-template-columns: 1fr !important;
+  }
+  
+  .coffee-cup {
+    display: none;
+  }
+}
+
+/* Hover effects */
+.amount-btn:hover {
+  transform: scale(1.05);
+}
+
+.send-btn:hover {
+  background: #5A3E2A !important;
+  transform: scale(1.02);
+}
+
+.donate-btn:hover {
+  background: #5A3E2A !important;
+  transform: scale(1.05);
+}
+
+.card:hover {
+  transform: translateY(-8px);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+  border-color: #D4A574;
+}
+
+.filter-tab:hover {
+  transform: translateY(-2px);
+}
