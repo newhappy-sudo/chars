@@ -95,7 +95,7 @@ const saveCampaigns = async (campaigns) => {
 };
 
 // Admin Panel Component
-function AdminPanel({ campaigns, onUpdateCampaigns, onClose }) {
+function AdminPanel({ campaigns, onUpdateCampaigns, onClose, darkMode }) {
   const [editingCampaign, setEditingCampaign] = useState(null);
 
   const handleDelete = async (campaignId) => {
@@ -240,7 +240,7 @@ function AdminPanel({ campaigns, onUpdateCampaigns, onClose }) {
 }
 
 // Campaign Detail Component
-function CampaignDetail({ campaign, onBack, onDonate }) {
+function CampaignDetail({ campaign, onBack, onDonate, darkMode }) {
   const formatTime = (timestamp) => {
     const diff = Date.now() - timestamp;
     const hours = Math.floor(diff / 3600000);
@@ -269,14 +269,28 @@ function CampaignDetail({ campaign, onBack, onDonate }) {
 
         <div style={styles.detailInfo}>
           <div style={styles.detailHeader}>
-            <div style={styles.detailAvatar}>{campaign.avatar}</div>
+            <div style={styles.detailAvatar}>
+              <img 
+                src={campaign.image} 
+                alt={campaign.name}
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'contain'
+                }}
+              />
+            </div>
             <div>
               <h1 style={styles.detailName}>{campaign.name}</h1>
               <span style={{
                 ...styles.detailType,
-                ...(campaign.type === 'charity' ? styles.detailTypeCharity : styles.detailTypeCreator)
+                ...(campaign.type === 'charity' ? styles.detailTypeCharity : styles.detailTypePerson)
               }}>
-                {campaign.type === 'charity' ? '❤️ Charity' : '✨ Creator'}
+                {campaign.type === 'charity' ? (
+                  <><i className="bi bi-balloon-heart"></i> Charity</>
+                ) : (
+                  <><i className="bi bi-person-badge"></i> Person</>
+                )}
               </span>
             </div>
           </div>
@@ -303,11 +317,7 @@ function CampaignDetail({ campaign, onBack, onDonate }) {
           <div style={styles.detailStats}>
             <div style={styles.detailStatItem}>
               <div style={styles.detailStatNumber}>{campaign.supporters}</div>
-              <div style={styles.detailStatLabel}>Supporters</div>
-            </div>
-            <div style={styles.detailStatItem}>
-              <div style={styles.detailStatNumber}>{campaign.timeRemaining}</div>
-              <div style={styles.detailStatLabel}>Remaining</div>
+              <div style={styles.detailStatLabel}>Contributors</div>
             </div>
             <div style={styles.detailStatItem}>
               <div style={styles.detailStatNumber}>{Math.round(progress)}%</div>
@@ -347,7 +357,7 @@ function CampaignDetail({ campaign, onBack, onDonate }) {
 }
 
 // Create Campaign Component
-function CreateCampaign({ onClose, onCreate }) {
+function CreateCampaign({ onClose, onCreate, darkMode }) {
   const { publicKey } = useWallet();
   const [formData, setFormData] = useState({
     name: '',
@@ -367,7 +377,7 @@ function CreateCampaign({ onClose, onCreate }) {
     const newCampaign = {
       id: Date.now(),
       ...formData,
-      avatar: formData.type === 'creator' ? '✨' : '❤️',
+      avatar: formData.type === 'person' ? <i className="bi bi-person-badge"></i> : <i className="bi bi-balloon-heart"></i>,
       walletAddress: publicKey.toString(),
       currentAmount: 0,
       goalAmount: parseFloat(formData.goalAmount),
@@ -397,66 +407,121 @@ function CreateCampaign({ onClose, onCreate }) {
 
   return (
     <div style={styles.modalOverlay} onClick={onClose}>
-      <div style={styles.modal} onClick={(e) => e.stopPropagation()} className="modal">
-        <button onClick={onClose} style={styles.closeBtn} className="close-btn">✕</button>
+      <div style={{
+        ...styles.modal,
+        background: darkMode ? '#1e293b' : 'white',
+        color: darkMode ? '#f1f5f9' : '#1A1A1A'
+      }} onClick={(e) => e.stopPropagation()} className="modal">
+        <button onClick={onClose} style={{
+          ...styles.closeBtn,
+          background: darkMode ? '#334155' : '#F5F1ED',
+          color: darkMode ? '#cbd5e1' : '#666'
+        }} className="close-btn">✕</button>
         
-        <div style={styles.modalHeader}>
-          <h2 style={styles.modalTitle}>Create a Campaign</h2>
-          <p style={styles.modalSubtitle}>Share your project with the community</p>
+        <div style={{
+          ...styles.modalHeader,
+          borderBottom: `1px solid ${darkMode ? '#334155' : '#F0EBE6'}`
+        }}>
+          <h2 style={{
+            ...styles.modalTitle,
+            color: darkMode ? '#f1f5f9' : '#1A1A1A'
+          }}>Create a Campaign</h2>
+          <p style={{
+            ...styles.modalSubtitle,
+            color: darkMode ? '#cbd5e1' : '#666'
+          }}>Share your project with the community</p>
         </div>
         
         <form onSubmit={handleSubmit} style={styles.form}>
           <div style={styles.formGroup}>
-            <label style={styles.label}>Name *</label>
+            <label style={{
+              ...styles.label,
+              color: darkMode ? '#f1f5f9' : '#1A1A1A'
+            }}>Name *</label>
             <input
               type="text"
               value={formData.name}
               onChange={(e) => setFormData({...formData, name: e.target.value})}
               placeholder="Your name or organization"
               required
-              style={styles.input}
+              style={{
+                ...styles.input,
+                background: darkMode ? '#334155' : 'white',
+                color: darkMode ? '#f1f5f9' : '#1A1A1A',
+                borderColor: darkMode ? '#4b5563' : '#E0E0E0'
+              }}
             />
           </div>
 
           <div style={styles.formGroup}>
-            <label style={styles.label}>Type *</label>
+            <label style={{
+              ...styles.label,
+              color: darkMode ? '#f1f5f9' : '#1A1A1A'
+            }}>Type *</label>
             <select
               value={formData.type}
               onChange={(e) => setFormData({...formData, type: e.target.value})}
-              style={styles.input}
+              style={{
+                ...styles.input,
+                background: darkMode ? '#334155' : 'white',
+                color: darkMode ? '#f1f5f9' : '#1A1A1A',
+                borderColor: darkMode ? '#4b5563' : '#E0E0E0'
+              }}
             >
-              <option value="creator"><i class="bi bi-file-person"></i> Person</option>
-              <option value="charity">❤️ Charity</option>
+              <option value="person"><i className="bi bi-person-badge"></i> Person</option>
+              <option value="charity"><i className="bi bi-balloon-heart"></i> Charity</option>
             </select>
           </div>
 
           <div style={styles.formGroup}>
-            <label style={styles.label}>Photo URL *</label>
+            <label style={{
+              ...styles.label,
+              color: darkMode ? '#f1f5f9' : '#1A1A1A'
+            }}>Photo URL *</label>
             <input
               type="url"
               value={formData.image}
               onChange={(e) => setFormData({...formData, image: e.target.value})}
               placeholder="https://example.com/image.jpg"
               required
-              style={styles.input}
+              style={{
+                ...styles.input,
+                background: darkMode ? '#334155' : 'white',
+                color: darkMode ? '#f1f5f9' : '#1A1A1A',
+                borderColor: darkMode ? '#4b5563' : '#E0E0E0'
+              }}
             />
-            <span style={styles.hint}>Link to your profile photo</span>
+            <span style={{
+              ...styles.hint,
+              color: darkMode ? '#94a3b8' : '#999'
+            }}>Link to your profile photo</span>
           </div>
 
           <div style={styles.formGroup}>
-            <label style={styles.label}>Description *</label>
+            <label style={{
+              ...styles.label,
+              color: darkMode ? '#f1f5f9' : '#1A1A1A'
+            }}>Description *</label>
             <textarea
               value={formData.description}
               onChange={(e) => setFormData({...formData, description: e.target.value})}
               placeholder="Describe your project..."
               required
               rows="4"
-              style={styles.textarea}
+              style={{
+                ...styles.textarea,
+                background: darkMode ? '#334155' : 'white',
+                color: darkMode ? '#f1f5f9' : '#1A1A1A',
+                borderColor: darkMode ? '#4b5563' : '#E0E0E0'
+              }}
             />
           </div>
 
           <div style={styles.formGroup}>
-            <label style={styles.label}>Goal (SOL) *</label>
+            <label style={{
+              ...styles.label,
+              color: darkMode ? '#f1f5f9' : '#1A1A1A'
+            }}>Goal (SOL) *</label>
             <input
               type="number"
               step="0.1"
@@ -465,12 +530,21 @@ function CreateCampaign({ onClose, onCreate }) {
               onChange={(e) => setFormData({...formData, goalAmount: e.target.value})}
               placeholder="100"
               required
-              style={styles.input}
+              style={{
+                ...styles.input,
+                background: darkMode ? '#334155' : 'white',
+                color: darkMode ? '#f1f5f9' : '#1A1A1A',
+                borderColor: darkMode ? '#4b5563' : '#E0E0E0'
+              }}
             />
           </div>
 
           {!publicKey && (
-            <div style={styles.walletWarning}>
+            <div style={{
+              ...styles.walletWarning,
+              background: darkMode ? '#334155' : '#FEF3C7',
+              color: darkMode ? '#fbbf24' : '#92400E'
+            }}>
               ⚠️ Connect your wallet to create a campaign
             </div>
           )}
@@ -479,7 +553,10 @@ function CreateCampaign({ onClose, onCreate }) {
             Submit Campaign
           </button>
           
-          <p style={styles.hint}>Your campaign will be reviewed by an admin before going live.</p>
+          <p style={{
+            ...styles.hint,
+            color: darkMode ? '#94a3b8' : '#999'
+          }}>Your campaign will be reviewed by an admin before going live.</p>
         </form>
       </div>
     </div>
@@ -487,7 +564,7 @@ function CreateCampaign({ onClose, onCreate }) {
 }
 
 // Donation Modal Component
-function DonationModal({ campaign, onClose, onSuccess }) {
+function DonationModal({ campaign, onClose, onSuccess, darkMode }) {
   const { connection } = useConnection();
   const { publicKey, sendTransaction } = useWallet();
   const [amount, setAmount] = useState('');
@@ -550,20 +627,50 @@ function DonationModal({ campaign, onClose, onSuccess }) {
 
   return (
     <div style={styles.modalOverlay} onClick={onClose}>
-      <div style={styles.modal} onClick={(e) => e.stopPropagation()} className="modal">
-        <button onClick={onClose} style={styles.closeBtn} className="close-btn">✕</button>
+      <div style={{
+        ...styles.modal,
+        background: darkMode ? '#1e293b' : 'white',
+        color: darkMode ? '#f1f5f9' : '#1A1A1A'
+      }} onClick={(e) => e.stopPropagation()} className="modal">
+        <button onClick={onClose} style={{
+          ...styles.closeBtn,
+          background: darkMode ? '#334155' : '#F5F1ED',
+          color: darkMode ? '#cbd5e1' : '#666'
+        }} className="close-btn">✕</button>
         
-        <div style={styles.modalHeader}>
-          <div style={styles.modalAvatar}>{campaign.avatar}</div>
-          <h2 style={styles.modalTitle}>Donate to {campaign.name}</h2>
-          <p style={styles.modalSubtitle}>
+        <div style={{
+          ...styles.modalHeader,
+          borderBottom: `1px solid ${darkMode ? '#334155' : '#F0EBE6'}`
+        }}>
+          <div style={styles.modalAvatar}>
+            <img 
+              src={campaign.image} 
+              alt={campaign.name}
+              style={{
+                width: '100%',
+                height: '100%',
+                objectFit: 'contain'
+              }}
+            />
+          </div>
+          <h2 style={{
+            ...styles.modalTitle,
+            color: darkMode ? '#f1f5f9' : '#1A1A1A'
+          }}>Donate to {campaign.name}</h2>
+          <p style={{
+            ...styles.modalSubtitle,
+            color: darkMode ? '#cbd5e1' : '#666'
+          }}>
             {campaign.currentAmount} / {campaign.goalAmount} SOL raised
           </p>
         </div>
 
         <div style={styles.modalBody}>
           <div style={styles.formGroup}>
-            <label style={styles.label}>Amount (SOL)</label>
+            <label style={{
+              ...styles.label,
+              color: darkMode ? '#f1f5f9' : '#1A1A1A'
+            }}>Amount (SOL)</label>
             <input
               type="number"
               step="0.1"
@@ -571,7 +678,12 @@ function DonationModal({ campaign, onClose, onSuccess }) {
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
               placeholder="1.0"
-              style={styles.input}
+              style={{
+                ...styles.input,
+                background: darkMode ? '#334155' : 'white',
+                color: darkMode ? '#f1f5f9' : '#1A1A1A',
+                borderColor: darkMode ? '#4b5563' : '#E0E0E0'
+              }}
             />
           </div>
 
@@ -592,14 +704,22 @@ function DonationModal({ campaign, onClose, onSuccess }) {
           </div>
 
           <div style={styles.formGroup}>
-            <label style={styles.label}>Message (optional)</label>
+            <label style={{
+              ...styles.label,
+              color: darkMode ? '#f1f5f9' : '#1A1A1A'
+            }}>Message (optional)</label>
             <textarea
               value={message}
               onChange={(e) => setMessage(e.target.value)}
               placeholder="Leave a message of support..."
               maxLength="200"
               rows="3"
-              style={styles.textarea}
+              style={{
+                ...styles.textarea,
+                background: darkMode ? '#334155' : 'white',
+                color: darkMode ? '#f1f5f9' : '#1A1A1A',
+                borderColor: darkMode ? '#4b5563' : '#E0E0E0'
+              }}
             />
           </div>
 
@@ -619,7 +739,7 @@ function DonationModal({ campaign, onClose, onSuccess }) {
             }}
             className="donate-btn"
           >
-            {loading ? '⏳ Sending...' : '☕ Send Donation'}
+            {loading ? 'Sending...' : 'Send Donation'} <i class="bi bi-balloon-heart"></i>
           </button>
 
           {status && (
@@ -632,38 +752,59 @@ function DonationModal({ campaign, onClose, onSuccess }) {
 }
 
 // Campaign Card Component
-function CampaignCard({ campaign, onView, onDonate }) {
+function CampaignCard({ campaign, onView, onDonate, darkMode }) {
   const progress = Math.min((campaign.currentAmount / campaign.goalAmount) * 100, 100);
 
   return (
-    <div style={styles.card} className="campaign-card" onClick={() => onView(campaign)}>
-      <div style={styles.cardHeader}>
-        <div style={styles.avatar}>{campaign.avatar}</div>
+    <div style={{
+      ...styles.card,
+      ...(darkMode ? styles.cardDark : {})
+    }} className="campaign-card" onClick={() => onView(campaign)}>
+      <div style={{
+        ...styles.cardHeader,
+        borderBottom: `1px solid ${darkMode ? '#334155' : '#F0EBE6'}`
+      }}>
+        <div style={styles.avatar}>
+          <img 
+            src={campaign.image} 
+            alt={campaign.name}
+            style={{
+              width: '100%',
+              height: '100%',
+              objectFit: 'contain'
+            }}
+          />
+        </div>
         <div style={styles.cardInfo}>
-          <div style={styles.cardName}>{campaign.name}</div>
+          <div style={{
+            ...styles.cardName,
+            color: darkMode ? '#f1f5f9' : '#1A1A1A'
+          }}>{campaign.name}</div>
           <span style={{
             ...styles.cardType,
-            ...(campaign.type === 'charity' ? styles.cardTypeCharity : styles.cardTypeCreator)
+            ...(campaign.type === 'charity' ? styles.cardTypeCharity : styles.cardTypePerson)
           }}>
-            {campaign.type === 'charity' ? '❤️ Charity' : '<i class="bi bi-file-person"></i> Person'}
+            {campaign.type === 'charity' ? (
+              <><i className="bi bi-balloon-heart"></i> Charity</>
+            ) : (
+              <><i className="bi bi-person-badge"></i> Person</>
+            )}
           </span>
         </div>
       </div>
 
       <div style={styles.cardBody}>
-        <p style={styles.description}>{campaign.description}</p>
-
-        <div style={{
-          ...styles.timeRemaining,
-          ...(campaign.urgent ? styles.timeUrgent : {})
-        }}>
-          <span style={styles.timeIcon}>{campaign.urgent ? '⚠️' : '⏰'}</span>
-          <span style={styles.timeText}>{campaign.timeRemaining} remaining</span>
-        </div>
+        <p style={{
+          ...styles.description,
+          color: darkMode ? '#cbd5e1' : '#666'
+        }}>{campaign.description}</p>
 
         <div style={styles.progressSection}>
           <div style={styles.progressStats}>
-            <span style={styles.progressLabel}>Progress</span>
+            <span style={{
+              ...styles.progressLabel,
+              color: darkMode ? '#94a3b8' : '#666'
+            }}>Progress</span>
             <span style={styles.progressAmount}>
               {campaign.currentAmount} / {campaign.goalAmount} SOL
             </span>
@@ -674,14 +815,15 @@ function CampaignCard({ campaign, onView, onDonate }) {
         </div>
       </div>
 
-      <div style={styles.cardFooter}>
+      <div style={{
+        ...styles.cardFooter,
+        background: darkMode ? '#334155' : '#FAFAFA'
+      }}>
         <div style={styles.supporters}>
-          <div style={styles.supportersAvatars}>
-            <div style={styles.miniAvatar}>👤</div>
-            <div style={styles.miniAvatar}>👤</div>
-            <div style={styles.miniAvatar}>👤</div>
-          </div>
-          <span style={styles.supportersCount}>{campaign.supporters} supporters</span>
+          <span style={{
+            ...styles.supportersCount,
+            color: darkMode ? '#cbd5e1' : '#666'
+          }}>{campaign.supporters} contributors</span>
         </div>
         <button 
           style={styles.donateBtn} 
@@ -708,6 +850,7 @@ function CoffeeCampaignsApp() {
   const [showDonate, setShowDonate] = useState(null);
   const [showAdmin, setShowAdmin] = useState(false);
   const [view, setView] = useState('grid');
+  const [darkMode, setDarkMode] = useState(false);
 
   // Enable blockchain sync - automatically checks every 30 seconds
   const { syncStatus, syncNow } = useBlockchainSync(true);
@@ -724,6 +867,15 @@ function CoffeeCampaignsApp() {
     }
   }, [syncStatus.updated]);
 
+  // Toggle dark mode class on body
+  useEffect(() => {
+    if (darkMode) {
+      document.body.classList.add('dark-mode');
+    } else {
+      document.body.classList.remove('dark-mode');
+    }
+  }, [darkMode]);
+
   // Check if current wallet is admin
   const isAdmin = publicKey?.toString() === ADMIN_WALLET;
 
@@ -731,9 +883,8 @@ function CoffeeCampaignsApp() {
 
   const filteredCampaigns = useMemo(() => {
     if (filter === 'all') return approvedCampaigns;
-    if (filter === 'creator') return approvedCampaigns.filter(c => c.type === 'creator');
+    if (filter === 'person') return approvedCampaigns.filter(c => c.type === 'person');
     if (filter === 'charity') return approvedCampaigns.filter(c => c.type === 'charity');
-    if (filter === 'urgent') return approvedCampaigns.filter(c => c.urgent);
     return approvedCampaigns;
   }, [filter, approvedCampaigns]);
 
@@ -758,17 +909,22 @@ function CoffeeCampaignsApp() {
 
   if (view === 'detail' && selectedCampaign) {
     return (
-      <div style={styles.app}>
+      <div style={{
+        ...styles.app,
+        ...(darkMode ? styles.appDark : {})
+      }}>
         <CampaignDetail 
           campaign={selectedCampaign} 
           onBack={handleBack}
           onDonate={(c) => setShowDonate(c)}
+          darkMode={darkMode}
         />
         {showDonate && (
           <DonationModal 
             campaign={showDonate} 
             onClose={() => setShowDonate(null)}
             onSuccess={handleDonationSuccess}
+            darkMode={darkMode}
           />
         )}
       </div>
@@ -776,20 +932,57 @@ function CoffeeCampaignsApp() {
   }
 
   return (
-    <div style={styles.app}>
+    <div style={{
+      ...styles.app,
+      ...(darkMode ? styles.appDark : {})
+    }}>
       {/* Hero Section */}
-      <div style={styles.hero}>
+      <div style={{
+        ...styles.hero,
+        ...(darkMode ? {background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)'} : {})
+      }}>
         <div style={styles.heroContainer} className="hero-container">
           {/* Left Content */}
           <div style={styles.heroContent}>
-            <div style={styles.badge}>
-              <span>⚡</span> Powered by Solana
+            <div style={{display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '2rem', flexWrap: 'wrap'}}>
+              <div style={styles.badge}>
+                <button 
+                onClick={() => setDarkMode(!darkMode)} 
+                style={{
+                  padding: '0.5rem 1rem',
+                  background: darkMode ? '#1f2937' : 'white',
+                  color: darkMode ? '#f1f5f9' : '#1A1A1A',
+                  border: `2px solid ${darkMode ? '#374151' : '#e5e7eb'}`,
+                  borderRadius: '50px',
+                  fontSize: '0.875rem',
+                  fontWeight: '500',
+                  cursor: 'pointer',
+                  transition: 'all 0.3s',
+                  lineHeight: '1',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
+                  height: 'fit-content',
+                }}
+                className="dark-mode-btn"
+              >
+                {darkMode ? <><i className="bi bi-sun"></i> Light</> : <><i className="bi bi-moon-stars"></i> Dark</>}
+              </button>
+                <span>⚡</span> Powered by Solana
+              </div>
             </div>
-            <h1 style={styles.heroTitle}>
+            <h1 style={{
+              ...styles.heroTitle,
+              color: darkMode ? '#f1f5f9' : '#1A1A1A'
+            }}>
               Support your favorite <span style={styles.highlight}>cause</span>
             </h1>
-            <p style={styles.heroSubtitle}>
-              Send micro-donations in seconds.<br /> Zero fees, instant transactions.<br /> 99% goes to the creator, 1% goes to marketing and development.
+            <p style={{
+              ...styles.heroSubtitle,
+              color: darkMode ? '#cbd5e1' : '#666'
+            }}>
+              Send micro-donations in seconds. Zero fees, instant transactions, 100% goes to the creator.
             </p>
             
             <div style={styles.ctaGroup}>
@@ -825,9 +1018,13 @@ function CoffeeCampaignsApp() {
               <div className="phone-mockup" style={styles.phone}>
                 <div style={styles.phoneScreen}>
                   <div style={styles.screenContent}>
-                    <div className="coffee-icon" style={styles.coffeeIcon}>☕</div>
+                    <img 
+                      src="https://www.wateraid.org/au/sites/g/files/jkxoof231/files/styles/full_grid_image/public/wateraids-new-logo.webp?itok=oA3JIR7L" 
+                      alt="WaterAid"
+                      style={styles.screenLogo}
+                    />
                     <div style={styles.screenTitle}>WaterAid</div>
-                    <div style={styles.screenSubtitle}>Charities</div>
+                    <div style={styles.screenSubtitle}>Charity</div>
                     
                     <div style={styles.donationAmounts}>
                       <button className="amount-btn" style={styles.amountBtn}>0.5 SOL</button>
@@ -836,20 +1033,8 @@ function CoffeeCampaignsApp() {
                       <button className="amount-btn" style={styles.amountBtn}>5 SOL</button>
                     </div>
                     
-                    <button className="send-btn" style={styles.sendBtn}>Send Coffee ☕</button>
+                    <button className="send-btn" style={styles.sendBtn}>Send Donation <i class="bi bi-balloon-heart"></i></button>
                   </div>
-                </div>
-              </div>
-
-              {/* Coffee Cup */}
-              <div className="coffee-cup" style={styles.coffeeCup}>
-                <div className="steam" style={styles.steam}>
-                  <span style={styles.steamSpan}></span>
-                  <span style={styles.steamSpan}></span>
-                  <span style={styles.steamSpan}></span>
-                </div>
-                <div className="cup-body" style={styles.cupBody}>
-                  <div style={styles.cupHandle}></div>
                 </div>
               </div>
             </div>
@@ -866,21 +1051,31 @@ function CoffeeCampaignsApp() {
             <div style={styles.statNumber}>
               {approvedCampaigns.reduce((sum, c) => sum + c.supporters, 0)}
             </div>
-            <div style={styles.statLabel}>Total Supporters</div>
+            <div style={styles.statLabel}>Total Contributors</div>
           </div>
           <div style={styles.statItem}>
-            <div style={styles.statNumber}>$0</div>
+            <div style={styles.statNumber}>0 SOL</div>
             <div style={styles.statLabel}>Platform Fees</div>
           </div>
         </div>
       </div>
 
       {/* Campaigns Section */}
-      <section style={styles.campaignsSection}>
+      <section style={{
+        ...styles.campaignsSection,
+        background: darkMode ? '#1e293b' : 'white',
+        color: darkMode ? '#f1f5f9' : '#1A1A1A'
+      }}>
         <div style={styles.sectionHeader}>
-          <h2 style={styles.sectionTitle}>Active Campaigns</h2>
-          <p style={styles.sectionDescription}>
-            Discover charities & persons that need your support !
+          <h2 style={{
+            ...styles.sectionTitle,
+            color: darkMode ? '#f1f5f9' : '#1A1A1A'
+          }}>Active Campaigns</h2>
+          <p style={{
+            ...styles.sectionDescription,
+            color: darkMode ? '#cbd5e1' : '#666'
+          }}>
+            Discover creators and charities that need your support
           </p>
         </div>
 
@@ -888,9 +1083,8 @@ function CoffeeCampaignsApp() {
         <div style={styles.filterTabs}>
           {[
             { value: 'all', label: 'All' },
-            { value: 'creator', label: 'Creators' },
-            { value: 'charity', label: 'Charities' },
-            { value: 'urgent', label: 'Urgent' }
+            { value: 'person', label: 'Person' },
+            { value: 'charity', label: 'Charities' }
           ].map(tab => (
             <button
               key={tab.value}
@@ -898,7 +1092,9 @@ function CoffeeCampaignsApp() {
               className="filter-tab"
               style={{
                 ...styles.filterTab,
-                ...(filter === tab.value ? styles.filterTabActive : {})
+                ...(filter === tab.value ? styles.filterTabActive : {}),
+                background: darkMode && filter !== tab.value ? '#334155' : (filter === tab.value ? '#7c3aed' : '#F5F1ED'),
+                color: darkMode && filter !== tab.value ? '#cbd5e1' : (filter === tab.value ? 'white' : '#666')
               }}
             >
               {tab.label}
@@ -919,6 +1115,7 @@ function CoffeeCampaignsApp() {
                 campaign={campaign}
                 onView={handleViewCampaign}
                 onDonate={setShowDonate}
+                darkMode={darkMode}
               />
             ))
           )}
@@ -930,6 +1127,7 @@ function CoffeeCampaignsApp() {
         <CreateCampaign 
           onClose={() => setShowCreate(false)}
           onCreate={handleCreateCampaign}
+          darkMode={darkMode}
         />
       )}
 
@@ -938,6 +1136,7 @@ function CoffeeCampaignsApp() {
           campaign={showDonate} 
           onClose={() => setShowDonate(null)}
           onSuccess={handleDonationSuccess}
+          darkMode={darkMode}
         />
       )}
 
@@ -946,6 +1145,7 @@ function CoffeeCampaignsApp() {
           campaigns={campaigns}
           onUpdateCampaigns={setCampaigns}
           onClose={() => setShowAdmin(false)}
+          darkMode={darkMode}
         />
       )}
     </div>
@@ -976,7 +1176,7 @@ export default function App() {
 // Styles (continuing in next part due to length...)
 const styles = {
   app: {
-    fontFamily: "'DM Sans', sans-serif",
+    fontFamily: "'Google Sans', -apple-system, BlinkMacSystemFont, sans-serif",
     background: 'linear-gradient(135deg, #FAFAFA 0%, #F0EBE6 100%)',
     minHeight: '100vh',
     color: '#1A1A1A',
@@ -1017,9 +1217,9 @@ const styles = {
     marginBottom: '2rem',
   },
   heroTitle: {
-    fontFamily: "'Playfair Display', serif",
+    fontFamily: "'Google Sans', sans-serif",
     fontSize: 'clamp(2.5rem, 6vw, 4.5rem)',
-    fontWeight: '800',
+    fontWeight: '700',
     lineHeight: '1.1',
     marginBottom: '1.5rem',
     color: '#1A1A1A',
@@ -1103,12 +1303,18 @@ const styles = {
     justifyContent: 'center',
     textAlign: 'center',
   },
+  screenLogo: {
+    width: '80px',
+    height: '80px',
+    objectFit: 'contain',
+    marginBottom: '1rem',
+  },
   coffeeIcon: {
     fontSize: '4rem',
     marginBottom: '1rem',
   },
   screenTitle: {
-    fontFamily: "'Playfair Display', serif",
+    fontFamily: "'Google Sans', sans-serif",
     fontSize: '1.75rem',
     fontWeight: '700',
     color: '#1A1A1A',
@@ -1210,7 +1416,7 @@ const styles = {
     textAlign: 'center',
   },
   statNumber: {
-    fontFamily: "'Playfair Display', serif",
+    fontFamily: "'Google Sans', sans-serif",
     fontSize: '2.5rem',
     fontWeight: '700',
     color: '#7c3aed',
@@ -1234,7 +1440,7 @@ const styles = {
     textAlign: 'center',
   },
   sectionTitle: {
-    fontFamily: "'Playfair Display', serif",
+    fontFamily: "'Google Sans', sans-serif",
     fontSize: 'clamp(2rem, 4vw, 3rem)',
     fontWeight: '700',
     color: '#1A1A1A',
@@ -1305,13 +1511,15 @@ const styles = {
   avatar: {
     width: '60px',
     height: '60px',
-    borderRadius: '50%',
-    background: 'linear-gradient(135deg, #7c3aed, #a78bfa)',
+    borderRadius: '8px',
+    background: '#f3f4f6',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     fontSize: '1.5rem',
     flexShrink: 0,
+    overflow: 'hidden',
+    border: '2px solid #e5e7eb',
   },
   cardInfo: {
     flex: 1,
@@ -1334,7 +1542,7 @@ const styles = {
     background: '#FEE2E2',
     color: '#991B1B',
   },
-  cardTypeCreator: {
+  cardTypePerson: {
     background: '#E9D5FF',
     color: '#6B21A8',
   },
@@ -1472,11 +1680,14 @@ const styles = {
   },
   detailImage: {
     width: '100%',
+    height: '0',
     paddingTop: '100%',
     backgroundSize: 'cover',
     backgroundPosition: 'center',
-    borderRadius: '20px',
+    borderRadius: '12px',
     boxShadow: '0 20px 60px rgba(0,0,0,0.15)',
+    position: 'relative',
+    overflow: 'hidden',
   },
   detailInfo: {},
   detailHeader: {
@@ -1488,16 +1699,18 @@ const styles = {
   detailAvatar: {
     width: '80px',
     height: '80px',
-    borderRadius: '50%',
-    background: 'linear-gradient(135deg, #7c3aed, #a78bfa)',
+    borderRadius: '8px',
+    background: '#f3f4f6',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     fontSize: '2.5rem',
     flexShrink: 0,
+    overflow: 'hidden',
+    border: '2px solid #e5e7eb',
   },
   detailName: {
-    fontFamily: "'Playfair Display', serif",
+    fontFamily: "'Google Sans', sans-serif",
     fontSize: '2.5rem',
     fontWeight: '700',
     margin: '0 0 0.5rem',
@@ -1509,7 +1722,7 @@ const styles = {
     borderRadius: '50px',
     display: 'inline-block',
   },
-  detailTypeCreator: {
+  detailTypePerson: {
     background: '#E9D5FF',
     color: '#6B21A8',
   },
@@ -1550,7 +1763,7 @@ const styles = {
   },
   detailStats: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(3, 1fr)',
+    gridTemplateColumns: 'repeat(2, 1fr)',
     gap: '1.5rem',
     marginBottom: '2rem',
   },
@@ -1561,7 +1774,7 @@ const styles = {
     borderRadius: '12px',
   },
   detailStatNumber: {
-    fontFamily: "'Playfair Display', serif",
+    fontFamily: "'Google Sans', sans-serif",
     fontSize: '2rem',
     fontWeight: '700',
     color: '#7c3aed',
@@ -1591,7 +1804,7 @@ const styles = {
     paddingTop: '2rem',
   },
   recentTitle: {
-    fontFamily: "'Playfair Display', serif",
+    fontFamily: "'Google Sans', sans-serif",
     fontSize: '1.5rem',
     fontWeight: '700',
     margin: '0 0 1.5rem',
@@ -1693,16 +1906,18 @@ const styles = {
   modalAvatar: {
     width: '80px',
     height: '80px',
-    borderRadius: '50%',
-    background: 'linear-gradient(135deg, #7c3aed, #a78bfa)',
+    borderRadius: '8px',
+    background: '#f3f4f6',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     fontSize: '2.5rem',
     margin: '0 auto 1rem',
+    overflow: 'hidden',
+    border: '2px solid #e5e7eb',
   },
   modalTitle: {
-    fontFamily: "'Playfair Display', serif",
+    fontFamily: "'Google Sans', sans-serif",
     fontSize: '1.75rem',
     fontWeight: '700',
     color: '#1A1A1A',
@@ -1832,7 +2047,7 @@ const styles = {
     padding: '2rem',
   },
   adminTitle: {
-    fontFamily: "'Playfair Display', serif",
+    fontFamily: "'Google Sans', sans-serif",
     fontSize: '2rem',
     fontWeight: '700',
     marginBottom: '2rem',
@@ -1955,5 +2170,36 @@ const styles = {
     color: '#7c3aed',
     fontSize: '1.5rem',
     lineHeight: '0',
+  },
+  
+  // Dark Mode Toggle Button
+  darkModeBtn: {
+    padding: '1rem',
+    background: 'white',
+    color: '#1A1A1A',
+    border: '2px solid #e5e7eb',
+    borderRadius: '12px',
+    fontSize: '1.5rem',
+    cursor: 'pointer',
+    transition: 'all 0.3s',
+    lineHeight: '1',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  darkModeBtnActive: {
+    background: '#1f2937',
+    borderColor: '#374151',
+  },
+  
+  // Dark Mode Styles
+  appDark: {
+    background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
+    color: '#f1f5f9',
+  },
+  cardDark: {
+    background: '#1e293b',
+    borderColor: '#334155',
+    color: '#f1f5f9',
   },
 };
