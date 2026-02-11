@@ -240,7 +240,10 @@ function AdminPanel({ campaigns, onUpdateCampaigns, onClose, darkMode }) {
 }
 
 // Campaign Detail Component
-function CampaignDetail({ campaign, onBack, onDonate, darkMode }) {
+function CampaignDetail({ campaign, onBack, onDonate, onRedeem, darkMode }) {
+  const { publicKey } = useWallet();
+  const isCreator = publicKey && campaign.creatorWallet && publicKey.toString() === campaign.creatorWallet;
+  
   const formatTime = (timestamp) => {
     const diff = Date.now() - timestamp;
     const hours = Math.floor(diff / 3600000);
@@ -258,7 +261,7 @@ function CampaignDetail({ campaign, onBack, onDonate, darkMode }) {
       </button>
 
       <div style={styles.detailGrid} className="detail-grid">
-        <div style={styles.detailImageSection}>
+        <div style={styles.detailImageSection} className="detail-image-section">
           <div 
             style={{
               ...styles.detailImage,
@@ -282,24 +285,55 @@ function CampaignDetail({ campaign, onBack, onDonate, darkMode }) {
             </div>
             <div>
               <h1 style={styles.detailName}>{campaign.name}</h1>
-              <span style={{
-                ...styles.detailType,
-                ...(campaign.type === 'charity' ? styles.detailTypeCharity : styles.detailTypePerson)
-              }}>
-                {campaign.type === 'charity' ? (
-                  <><i className="bi bi-balloon-heart"></i> Charity</>
-                ) : (
-                  <><i className="bi bi-person-badge"></i> Person</>
+              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                <span style={{
+                  ...styles.detailType,
+                  ...(campaign.type === 'charity' ? styles.detailTypeCharity : styles.detailTypePerson)
+                }}>
+                  {campaign.type === 'charity' ? (
+                    <><i className="bi bi-balloon-heart"></i> Charity</>
+                  ) : (
+                    <><i className="bi bi-person-badge"></i> Person</>
+                  )}
+                </span>
+                
+                {/* Redeem Status Badge */}
+                {campaign.fundsRedeemed !== undefined && (
+                  <span style={{
+                    ...styles.detailType,
+                    ...(campaign.fundsRedeemed ? {
+                      background: darkMode ? '#7f1d1d' : '#FEE2E2',
+                      color: darkMode ? '#fca5a5' : '#991B1B'
+                    } : {
+                      background: darkMode ? '#065f46' : '#D1FAE5',
+                      color: darkMode ? '#6ee7b7' : '#065F46'
+                    })
+                  }}>
+                    {campaign.fundsRedeemed ? (
+                      <><i className="bi bi-check-square"></i> Campaign funds redeemed</>
+                    ) : (
+                      <><i className="bi bi-x-square"></i> Campaign funds not redeemed</>
+                    )}
+                  </span>
                 )}
-              </span>
+              </div>
             </div>
           </div>
 
-          <p style={styles.detailDescription}>{campaign.description}</p>
+          <p style={{
+            ...styles.detailDescription,
+            color: darkMode ? '#94a3b8' : '#333'
+          }}>{campaign.description}</p>
 
-          <div style={styles.detailWallet}>
+          <div style={{
+            ...styles.detailWallet,
+            background: darkMode ? '#1e293b' : '#F9FAFB'
+          }}>
             <span style={styles.detailWalletLabel}>Wallet Address</span>
-            <code style={styles.detailWalletAddress}>{campaign.walletAddress}</code>
+            <code style={{
+              ...styles.detailWalletAddress,
+              background: darkMode ? '#0f172a' : 'white'
+            }}>{campaign.walletAddress}</code>
           </div>
 
           <div style={styles.progressSection}>
@@ -315,39 +349,90 @@ function CampaignDetail({ campaign, onBack, onDonate, darkMode }) {
           </div>
 
           <div style={styles.detailStats}>
-            <div style={styles.detailStatItem}>
+            <div style={{
+              ...styles.detailStatItem,
+              background: darkMode ? '#1e293b' : '#F9FAFB'
+            }}>
               <div style={styles.detailStatNumber}>{campaign.supporters}</div>
               <div style={styles.detailStatLabel}>Contributors</div>
             </div>
-            <div style={styles.detailStatItem}>
+            <div style={{
+              ...styles.detailStatItem,
+              background: darkMode ? '#1e293b' : '#F9FAFB'
+            }}>
               <div style={styles.detailStatNumber}>{Math.round(progress)}%</div>
               <div style={styles.detailStatLabel}>Funded</div>
             </div>
           </div>
 
-          <button onClick={() => onDonate(campaign)} style={styles.detailDonateBtn} className="donate-btn">
-            ☕ Make a Donation
-          </button>
+          <div style={{
+            display: 'flex',
+            gap: '1rem',
+            marginBottom: '3rem'
+          }}>
+            <button 
+              onClick={() => onDonate(campaign)} 
+              style={{
+                ...styles.detailDonateBtn,
+                flex: 1,
+                marginBottom: 0
+              }} 
+              className="donate-btn"
+            >
+              Make a Donation <i className="bi bi-balloon-heart"></i>
+            </button>
+
+            {isCreator && (
+              <button 
+                onClick={() => onRedeem(campaign)} 
+                style={{
+                  ...styles.detailDonateBtn,
+                  background: '#10b981',
+                  flex: 1,
+                  marginBottom: 0
+                }} 
+                className="redeem-btn"
+              >
+                Redeem Funds <i className="bi bi-piggy-bank"></i>
+              </button>
+            )}
+          </div>
 
           <div style={styles.recentDonations}>
             <h3 style={styles.recentTitle}>Recent Donations</h3>
             {campaign.recentDonations && campaign.recentDonations.length > 0 ? (
               <div style={styles.donationsList}>
                 {campaign.recentDonations.slice(0, 5).map((donation, index) => (
-                  <div key={index} style={styles.donationItem} className="donation-item">
+                  <div key={index} style={{
+                    ...styles.donationItem,
+                    background: darkMode ? '#1e293b' : '#F9FAFB',
+                    borderColor: darkMode ? '#334155' : '#F0EBE6'
+                  }} className="donation-item">
                     <div style={styles.donationTop}>
-                      <span style={styles.donationFrom}>{donation.from}</span>
+                      <span style={{
+                        ...styles.donationFrom,
+                        color: darkMode ? '#94a3b8' : '#666'
+                      }}>{donation.from}</span>
                       <span style={styles.donationAmount}>{donation.amount} SOL</span>
                     </div>
                     {donation.message && (
-                      <p style={styles.donationMessage}>"{donation.message}"</p>
+                      <p style={{
+                        ...styles.donationMessage,
+                        color: darkMode ? '#cbd5e1' : '#333'
+                      }}>"{donation.message}"</p>
                     )}
-                    <span style={styles.donationTime}>{formatTime(donation.timestamp)}</span>
+                    <span style={{
+                      ...styles.donationTime,
+                      color: darkMode ? '#64748b' : '#999'
+                    }}>{formatTime(donation.timestamp)}</span>
                   </div>
                 ))}
               </div>
             ) : (
-              <p style={styles.noDonations}>No donations yet</p>
+              <p style={{
+                ...styles.noDonations,
+                color: darkMode ? '#64748b' : '#999'
+              }}>No donations yet</p>
             )}
           </div>
         </div>
@@ -361,7 +446,7 @@ function CreateCampaign({ onClose, onCreate, darkMode }) {
   const { publicKey } = useWallet();
   const [formData, setFormData] = useState({
     name: '',
-    type: 'creator',
+    type: 'person',
     image: '',
     description: '',
     goalAmount: '',
@@ -374,11 +459,31 @@ function CreateCampaign({ onClose, onCreate, darkMode }) {
       return;
     }
 
+    const campaignId = Date.now();
+    
+    // First, generate a campaign wallet
+    const walletResponse = await fetch('/api/create-campaign-wallet', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ 
+        campaignId: campaignId.toString(),
+        creatorWallet: publicKey.toString()
+      })
+    });
+
+    const walletData = await walletResponse.json();
+
+    if (!walletResponse.ok) {
+      alert('Error creating campaign wallet. Please try again.');
+      return;
+    }
+
     const newCampaign = {
-      id: Date.now(),
+      id: campaignId,
       ...formData,
       avatar: formData.type === 'person' ? <i className="bi bi-person-badge"></i> : <i className="bi bi-balloon-heart"></i>,
-      walletAddress: publicKey.toString(),
+      walletAddress: walletData.campaignWallet, // Generated wallet instead of user wallet
+      creatorWallet: publicKey.toString(), // Store creator wallet separately
       currentAmount: 0,
       goalAmount: parseFloat(formData.goalAmount),
       supporters: 0,
@@ -386,10 +491,11 @@ function CreateCampaign({ onClose, onCreate, darkMode }) {
       urgent: false,
       recentDonations: [],
       approved: false, // Needs admin approval
+      fundsRedeemed: false,
       createdAt: Date.now(),
     };
 
-    // Save to API
+    // Save campaign to API
     const response = await fetch('/api/create-campaign', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -545,7 +651,7 @@ function CreateCampaign({ onClose, onCreate, darkMode }) {
               background: darkMode ? '#334155' : '#FEF3C7',
               color: darkMode ? '#fbbf24' : '#92400E'
             }}>
-              ⚠️ Connect your wallet to create a campaign
+              Connect your wallet to create a campaign
             </div>
           )}
 
@@ -576,37 +682,46 @@ function DonationModal({ campaign, onClose, onSuccess, darkMode }) {
 
   const handleDonate = async () => {
     if (!publicKey) {
-      setStatus('❌ Please connect your wallet');
+      setStatus('Please connect your wallet');
       return;
     }
 
     if (!amount || parseFloat(amount) <= 0) {
-      setStatus('❌ Enter a valid amount');
+      setStatus('Enter a valid amount');
       return;
     }
 
     try {
       setLoading(true);
-      setStatus('⏳ Processing transaction...');
+      setStatus('Processing transaction...');
 
+      // Créer la transaction de transfert simple
       const recipientPubkey = new PublicKey(campaign.walletAddress);
       
       const transaction = new Transaction().add(
         SystemProgram.transfer({
           fromPubkey: publicKey,
           toPubkey: recipientPubkey,
-          lamports: parseFloat(amount) * LAMPORTS_PER_SOL,
+          lamports: Math.floor(parseFloat(amount) * LAMPORTS_PER_SOL),
         })
       );
 
-      const { blockhash } = await connection.getLatestBlockhash();
-      transaction.recentBlockhash = blockhash;
-      transaction.feePayer = publicKey;
+      // Envoyer la transaction
+      const signature = await sendTransaction(transaction, connection, {
+        skipPreflight: false,
+        preflightCommitment: 'confirmed',
+      });
 
-      const signature = await sendTransaction(transaction, connection);
-      await connection.confirmTransaction(signature, 'confirmed');
+      setStatus('Confirming transaction...');
+
+      // Attendre la confirmation
+      const confirmation = await connection.confirmTransaction(signature, 'confirmed');
       
-      setStatus(`✅ Donation sent! Thank you for your support 🎉`);
+      if (confirmation.value.err) {
+        throw new Error('Transaction failed');
+      }
+      
+      setStatus(`Donation sent! Thank you for your support`);
 
       // Note: Campaign stats will be updated automatically by blockchain sync (every 30 seconds)
       // Or you can manually trigger sync if you want instant update
@@ -619,7 +734,7 @@ function DonationModal({ campaign, onClose, onSuccess, darkMode }) {
       
     } catch (error) {
       console.error('Error:', error);
-      setStatus(`❌ Error: ${error.message}`);
+      setStatus(`Error: ${error.message || 'Transaction failed'}`);
     } finally {
       setLoading(false);
     }
@@ -725,7 +840,7 @@ function DonationModal({ campaign, onClose, onSuccess, darkMode }) {
 
           {!publicKey && (
             <div style={styles.walletWarning}>
-              ⚠️ Connect your wallet to continue
+              Connect your wallet to continue
             </div>
           )}
 
@@ -739,11 +854,302 @@ function DonationModal({ campaign, onClose, onSuccess, darkMode }) {
             }}
             className="donate-btn"
           >
-            {loading ? 'Sending...' : 'Send Donation'} <i class="bi bi-balloon-heart"></i>
+            {loading ? 'Sending...' : 'Send Donation'} <i className="bi bi-balloon-heart"></i>
           </button>
 
           {status && (
-            <div style={styles.status}>{status}</div>
+            <div style={{
+              ...styles.status,
+              background: darkMode ? '#334155' : '#F5F1ED',
+              color: darkMode ? '#cbd5e1' : '#1A1A1A'
+            }}>{status}</div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Redeem Funds Modal Component
+function RedeemFundsModal({ campaign, onClose, onSuccess, darkMode }) {
+  const { publicKey } = useWallet();
+  const [loading, setLoading] = useState(false);
+  const [status, setStatus] = useState('');
+  const [walletInfo, setWalletInfo] = useState(null);
+
+  useEffect(() => {
+    // Load wallet info when modal opens
+    const loadWalletInfo = async () => {
+      try {
+        const response = await fetch(`/api/get-campaign-wallet?campaignId=${campaign.id}`);
+        const data = await response.json();
+        if (response.ok) {
+          setWalletInfo(data);
+        }
+      } catch (error) {
+        console.error('Error loading wallet info:', error);
+      }
+    };
+    
+    loadWalletInfo();
+  }, [campaign.id]);
+
+  const handleRedeem = async () => {
+    if (!publicKey) {
+      setStatus('Please connect your wallet');
+      return;
+    }
+
+    // VÉRIFICATION : L'utilisateur connecté doit être le créateur
+    if (campaign.creatorWallet && publicKey.toString() !== campaign.creatorWallet) {
+      setStatus('Unauthorized: You are not the creator of this campaign');
+      return;
+    }
+
+    if (!walletInfo || walletInfo.currentBalance === 0) {
+      setStatus('No funds available to redeem');
+      return;
+    }
+
+    if (walletInfo.redeemed) {
+      setStatus('Funds already redeemed');
+      return;
+    }
+    
+    // Double vérification avec les données du wallet
+    if (walletInfo.creatorWallet && publicKey.toString() !== walletInfo.creatorWallet) {
+      setStatus('Unauthorized: Wallet verification failed');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setStatus('Processing redemption...');
+
+      const response = await fetch('/api/redeem-funds', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          campaignId: campaign.id.toString(),
+          creatorWallet: publicKey.toString()
+        })
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setStatus(`Success! You received ${data.creatorReceived.toFixed(2)} SOL (${data.feePercentage}% platform fee: ${data.feeCollected.toFixed(4)} SOL)`);
+        
+        if (onSuccess) onSuccess();
+
+        setTimeout(() => {
+          onClose();
+        }, 3000);
+      } else {
+        setStatus(`Error: ${data.error}`);
+      }
+      
+    } catch (error) {
+      console.error('Error:', error);
+      setStatus(`Error: ${error.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div style={styles.modalOverlay} onClick={onClose}>
+      <div style={{
+        ...styles.modal,
+        background: darkMode ? '#1e293b' : 'white',
+        color: darkMode ? '#f1f5f9' : '#1A1A1A'
+      }} onClick={(e) => e.stopPropagation()} className="modal">
+        <button onClick={onClose} style={{
+          ...styles.closeBtn,
+          background: darkMode ? '#334155' : '#F5F1ED',
+          color: darkMode ? '#cbd5e1' : '#666'
+        }} className="close-btn">✕</button>
+        
+        <div style={{
+          ...styles.modalHeader,
+          borderBottom: `1px solid ${darkMode ? '#334155' : '#F0EBE6'}`
+        }}>
+          <div style={styles.modalAvatar}>
+            <img 
+              src={campaign.image} 
+              alt={campaign.name}
+              style={{
+                width: '100%',
+                height: '100%',
+                objectFit: 'contain'
+              }}
+            />
+          </div>
+          <h2 style={{
+            ...styles.modalTitle,
+            color: darkMode ? '#f1f5f9' : '#1A1A1A'
+          }}>Redeem Funds</h2>
+          <p style={{
+            ...styles.modalSubtitle,
+            color: darkMode ? '#cbd5e1' : '#666'
+          }}>
+            {campaign.name}
+          </p>
+        </div>
+
+        <div style={styles.modalBody}>
+          {walletInfo ? (
+            <>
+              {/* Vérification créateur */}
+              {publicKey && campaign.creatorWallet && publicKey.toString() !== campaign.creatorWallet && (
+                <div style={{
+                  ...styles.walletWarning,
+                  background: darkMode ? '#7f1d1d' : '#FEE2E2',
+                  color: darkMode ? '#fca5a5' : '#991B1B',
+                  marginBottom: '1.5rem'
+                }}>
+                  You are not the creator of this campaign. Only the creator can redeem funds.
+                </div>
+              )}
+              
+              <div style={{
+                ...styles.walletInfoBox,
+                background: darkMode ? '#334155' : '#F9FAFB',
+                borderColor: darkMode ? '#4b5563' : '#E5E7EB'
+              }}>
+                <div style={styles.infoRow}>
+                  <span style={{
+                    ...styles.infoLabel,
+                    color: darkMode ? '#94a3b8' : '#6B7280'
+                  }}>Campaign Wallet:</span>
+                  <code style={{
+                    ...styles.infoValue,
+                    color: darkMode ? '#a78bfa' : '#7c3aed'
+                  }}>{walletInfo.campaignWallet.slice(0, 8)}...{walletInfo.campaignWallet.slice(-8)}</code>
+                </div>
+
+                <div style={styles.infoRow}>
+                  <span style={{
+                    ...styles.infoLabel,
+                    color: darkMode ? '#94a3b8' : '#6B7280'
+                  }}>Available Balance:</span>
+                  <span style={{
+                    ...styles.infoValue,
+                    color: darkMode ? '#10b981' : '#059669',
+                    fontWeight: '700',
+                    fontSize: '1.5rem'
+                  }}>{walletInfo.currentBalance.toFixed(4)} SOL</span>
+                </div>
+
+                {walletInfo.redeemed && (
+                  <div style={styles.infoRow}>
+                    <span style={{
+                      ...styles.infoLabel,
+                      color: darkMode ? '#94a3b8' : '#6B7280'
+                    }}>Status:</span>
+                    <span style={{
+                      ...styles.redeemedBadge,
+                      background: darkMode ? '#065f46' : '#D1FAE5',
+                      color: darkMode ? '#10b981' : '#065F46'
+                    }}>✓ Already Redeemed</span>
+                  </div>
+                )}
+
+                {walletInfo.currentBalance > 0 && !walletInfo.redeemed && (
+                  <>
+                    <div style={{
+                      ...styles.separator,
+                      borderColor: darkMode ? '#4b5563' : '#E5E7EB'
+                    }} />
+                    
+                    <div style={styles.infoRow}>
+                      <span style={{
+                        ...styles.infoLabel,
+                        color: darkMode ? '#94a3b8' : '#6B7280'
+                      }}>You will receive (99%):</span>
+                      <span style={{
+                        ...styles.infoValue,
+                        color: darkMode ? '#f1f5f9' : '#1A1A1A',
+                        fontWeight: '700'
+                      }}>{(walletInfo.currentBalance * 0.99).toFixed(4)} SOL</span>
+                    </div>
+
+                    <div style={styles.infoRow}>
+                      <span style={{
+                        ...styles.infoLabel,
+                        color: darkMode ? '#94a3b8' : '#6B7280'
+                      }}>Platform fee (1%):</span>
+                      <span style={{
+                        ...styles.infoValue,
+                        color: darkMode ? '#fbbf24' : '#D97706'
+                      }}>{(walletInfo.currentBalance * 0.01).toFixed(4)} SOL</span>
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {!publicKey && (
+                <div style={{
+                  ...styles.walletWarning,
+                  background: darkMode ? '#334155' : '#FEF3C7',
+                  color: darkMode ? '#fbbf24' : '#92400E'
+                }}>
+                  Connect your wallet to redeem funds
+                </div>
+              )}
+
+              {walletInfo.redeemed ? (
+                <div style={{
+                  ...styles.successBox,
+                  background: darkMode ? '#065f46' : '#D1FAE5',
+                  color: darkMode ? '#10b981' : '#065F46'
+                }}>
+                  Funds have been redeemed on {new Date(walletInfo.redeemedAt).toLocaleString()}
+                </div>
+              ) : (
+                <button
+                  onClick={handleRedeem}
+                  disabled={
+                    loading || 
+                    !publicKey || 
+                    walletInfo.currentBalance === 0 ||
+                    (campaign.creatorWallet && publicKey && publicKey.toString() !== campaign.creatorWallet)
+                  }
+                  style={{
+                    ...styles.redeemButton,
+                    opacity: (
+                      loading || 
+                      !publicKey || 
+                      walletInfo.currentBalance === 0 ||
+                      (campaign.creatorWallet && publicKey && publicKey.toString() !== campaign.creatorWallet)
+                    ) ? 0.5 : 1,
+                    cursor: (
+                      loading || 
+                      !publicKey || 
+                      walletInfo.currentBalance === 0 ||
+                      (campaign.creatorWallet && publicKey && publicKey.toString() !== campaign.creatorWallet)
+                    ) ? 'not-allowed' : 'pointer',
+                    background: '#10b981'
+                  }}
+                  className="redeem-btn"
+                >
+                  {loading ? 'Processing...' : 
+                   !publicKey ? 'Connect Wallet' :
+                   (campaign.creatorWallet && publicKey && publicKey.toString() !== campaign.creatorWallet) ? 'Not Creator' :
+                   `Redeem ${walletInfo.currentBalance.toFixed(4)} SOL`}
+                </button>
+              )}
+
+              {status && (
+                <div style={{
+                  ...styles.status,
+                  background: darkMode ? '#334155' : '#F5F1ED',
+                  color: darkMode ? '#cbd5e1' : '#1A1A1A'
+                }}>{status}</div>
+              )}
+            </>
+          ) : (
+            <div style={styles.loadingBox}>Loading wallet info...</div>
           )}
         </div>
       </div>
@@ -758,7 +1164,9 @@ function CampaignCard({ campaign, onView, onDonate, darkMode }) {
   return (
     <div style={{
       ...styles.card,
-      ...(darkMode ? styles.cardDark : {})
+      background: darkMode ? '#1e293b' : 'white',
+      borderColor: darkMode ? '#334155' : 'transparent',
+      color: darkMode ? '#f1f5f9' : '#1A1A1A'
     }} className="campaign-card" onClick={() => onView(campaign)}>
       <div style={{
         ...styles.cardHeader,
@@ -780,16 +1188,38 @@ function CampaignCard({ campaign, onView, onDonate, darkMode }) {
             ...styles.cardName,
             color: darkMode ? '#f1f5f9' : '#1A1A1A'
           }}>{campaign.name}</div>
-          <span style={{
-            ...styles.cardType,
-            ...(campaign.type === 'charity' ? styles.cardTypeCharity : styles.cardTypePerson)
-          }}>
-            {campaign.type === 'charity' ? (
-              <><i className="bi bi-balloon-heart"></i> Charity</>
-            ) : (
-              <><i className="bi bi-person-badge"></i> Person</>
+          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+            <span style={{
+              ...styles.cardType,
+              ...(campaign.type === 'charity' ? styles.cardTypeCharity : styles.cardTypePerson)
+            }}>
+              {campaign.type === 'charity' ? (
+                <><i className="bi bi-balloon-heart"></i> Charity</>
+              ) : (
+                <><i className="bi bi-person-badge"></i> Person</>
+              )}
+            </span>
+            
+            {/* Redeem Status Badge */}
+            {campaign.fundsRedeemed !== undefined && (
+              <span style={{
+                ...styles.cardType,
+                ...(campaign.fundsRedeemed ? {
+                  background: darkMode ? '#7f1d1d' : '#FEE2E2',
+                  color: darkMode ? '#fca5a5' : '#991B1B'
+                } : {
+                  background: darkMode ? '#065f46' : '#D1FAE5',
+                  color: darkMode ? '#6ee7b7' : '#065F46'
+                })
+              }}>
+                {campaign.fundsRedeemed ? (
+                  <><i className="bi bi-check-square"></i> Campaign funds redeemed</>
+                ) : (
+                  <><i className="bi bi-x-square"></i> Campaign funds not redeemed</>
+                )}
+              </span>
             )}
-          </span>
+          </div>
         </div>
       </div>
 
@@ -833,7 +1263,7 @@ function CampaignCard({ campaign, onView, onDonate, darkMode }) {
             onDonate(campaign);
           }}
         >
-          Donate ☕
+          Donate <i className="bi bi-balloon-heart"></i>
         </button>
       </div>
     </div>
@@ -848,6 +1278,7 @@ function CoffeeCampaignsApp() {
   const [selectedCampaign, setSelectedCampaign] = useState(null);
   const [showCreate, setShowCreate] = useState(false);
   const [showDonate, setShowDonate] = useState(null);
+  const [showRedeem, setShowRedeem] = useState(null);
   const [showAdmin, setShowAdmin] = useState(false);
   const [view, setView] = useState('grid');
   const [darkMode, setDarkMode] = useState(false);
@@ -917,12 +1348,21 @@ function CoffeeCampaignsApp() {
           campaign={selectedCampaign} 
           onBack={handleBack}
           onDonate={(c) => setShowDonate(c)}
+          onRedeem={(c) => setShowRedeem(c)}
           darkMode={darkMode}
         />
         {showDonate && (
           <DonationModal 
             campaign={showDonate} 
             onClose={() => setShowDonate(null)}
+            onSuccess={handleDonationSuccess}
+            darkMode={darkMode}
+          />
+        )}
+        {showRedeem && (
+          <RedeemFundsModal 
+            campaign={showRedeem} 
+            onClose={() => setShowRedeem(null)}
             onSuccess={handleDonationSuccess}
             darkMode={darkMode}
           />
@@ -946,7 +1386,9 @@ function CoffeeCampaignsApp() {
           <div style={styles.heroContent}>
             <div style={{display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '2rem', flexWrap: 'wrap'}}>
               <div style={styles.badge}>
-                <button 
+                <span>⚡</span> Powered by Solana
+              </div>
+              <button 
                 onClick={() => setDarkMode(!darkMode)} 
                 style={{
                   padding: '0.5rem 1rem',
@@ -969,8 +1411,6 @@ function CoffeeCampaignsApp() {
               >
                 {darkMode ? <><i className="bi bi-sun"></i> Light</> : <><i className="bi bi-moon-stars"></i> Dark</>}
               </button>
-                <span>⚡</span> Powered by Solana
-              </div>
             </div>
             <h1 style={{
               ...styles.heroTitle,
@@ -1033,7 +1473,7 @@ function CoffeeCampaignsApp() {
                       <button className="amount-btn" style={styles.amountBtn}>5 SOL</button>
                     </div>
                     
-                    <button className="send-btn" style={styles.sendBtn}>Send Donation <i class="bi bi-balloon-heart"></i></button>
+                    <button className="send-btn" style={styles.sendBtn}>Send Donation <i className="bi bi-balloon-heart"></i></button>
                   </div>
                 </div>
               </div>
@@ -1173,7 +1613,7 @@ export default function App() {
   );
 }
 
-// Styles (continuing in next part due to length...)
+// Styles
 const styles = {
   app: {
     fontFamily: "'Google Sans', -apple-system, BlinkMacSystemFont, sans-serif",
@@ -1214,7 +1654,6 @@ const styles = {
     fontWeight: '500',
     color: '#6F4E37',
     boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
-    marginBottom: '2rem',
   },
   heroTitle: {
     fontFamily: "'Google Sans', sans-serif",
@@ -1357,52 +1796,6 @@ const styles = {
     borderRadius: '12px',
     fontWeight: '600',
     fontSize: '1rem',
-  },
-  
-  coffeeCup: {
-    position: 'absolute',
-    bottom: '50px',
-    right: '-100px',
-    width: '180px',
-    height: '180px',
-    zIndex: 1,
-  },
-  steam: {
-    position: 'absolute',
-    top: '-30px',
-    left: '50%',
-    transform: 'translateX(-50%)',
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    gap: '5px',
-  },
-  steamSpan: {
-    display: 'block',
-    width: '3px',
-    height: '30px',
-    background: 'linear-gradient(to top, transparent, rgba(124, 58, 237, 0.3))',
-    borderRadius: '50%',
-    opacity: 0,
-  },
-  cupBody: {
-    width: '140px',
-    height: '160px',
-    background: 'linear-gradient(135deg, #FFFFFF 0%, #F5F1ED 100%)',
-    borderRadius: '0 0 70px 70px',
-    position: 'relative',
-    boxShadow: '0 20px 40px rgba(0, 0, 0, 0.15)',
-  },
-  cupHandle: {
-    position: 'absolute',
-    right: '-35px',
-    top: '40px',
-    width: '50px',
-    height: '70px',
-    border: '15px solid #FFFFFF',
-    borderLeft: 'none',
-    borderRadius: '0 50px 50px 0',
-    boxShadow: 'inset -3px 0 8px rgba(0, 0, 0, 0.1), 0 5px 15px rgba(0, 0, 0, 0.1)',
   },
   
   stats: {
@@ -1558,26 +1951,6 @@ const styles = {
     WebkitBoxOrient: 'vertical',
     overflow: 'hidden',
   },
-  timeRemaining: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '0.5rem',
-    padding: '0.75rem',
-    background: '#FEF3C7',
-    borderRadius: '10px',
-    marginBottom: '1rem',
-  },
-  timeUrgent: {
-    background: '#FEE2E2',
-  },
-  timeIcon: {
-    fontSize: '1.25rem',
-  },
-  timeText: {
-    fontSize: '0.875rem',
-    fontWeight: '600',
-    color: '#1A1A1A',
-  },
   progressSection: {
     marginBottom: '1rem',
   },
@@ -1619,25 +1992,9 @@ const styles = {
     alignItems: 'center',
     gap: '0.5rem',
   },
-  supportersAvatars: {
-    display: 'flex',
-  },
-  miniAvatar: {
-    width: '28px',
-    height: '28px',
-    borderRadius: '50%',
-    background: 'linear-gradient(135deg, #10B981, #059669)',
-    border: '2px solid white',
-    marginLeft: '-8px',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    fontSize: '0.7rem',
-  },
   supportersCount: {
     fontSize: '0.875rem',
     color: '#666',
-    marginLeft: '0.25rem',
   },
   donateBtn: {
     padding: '0.75rem 1.5rem',
@@ -1681,7 +2038,7 @@ const styles = {
   detailImage: {
     width: '100%',
     height: '0',
-    paddingTop: '100%',
+    paddingTop: '80%',
     backgroundSize: 'cover',
     backgroundPosition: 'center',
     borderRadius: '12px',
@@ -2172,34 +2529,66 @@ const styles = {
     lineHeight: '0',
   },
   
-  // Dark Mode Toggle Button
-  darkModeBtn: {
-    padding: '1rem',
-    background: 'white',
-    color: '#1A1A1A',
-    border: '2px solid #e5e7eb',
-    borderRadius: '12px',
-    fontSize: '1.5rem',
-    cursor: 'pointer',
-    transition: 'all 0.3s',
-    lineHeight: '1',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  darkModeBtnActive: {
-    background: '#1f2937',
-    borderColor: '#374151',
-  },
-  
   // Dark Mode Styles
   appDark: {
     background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
     color: '#f1f5f9',
   },
-  cardDark: {
-    background: '#1e293b',
-    borderColor: '#334155',
-    color: '#f1f5f9',
+  
+  // Redeem Modal Styles
+  walletInfoBox: {
+    padding: '1.5rem',
+    borderRadius: '12px',
+    border: '1px solid #E5E7EB',
+    marginBottom: '1.5rem',
+  },
+  infoRow: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: '1rem',
+  },
+  infoLabel: {
+    fontSize: '0.875rem',
+    fontWeight: '500',
+  },
+  infoValue: {
+    fontSize: '1rem',
+    fontFamily: 'monospace',
+  },
+  separator: {
+    borderTop: '1px solid #E5E7EB',
+    margin: '1rem 0',
+  },
+  redeemedBadge: {
+    padding: '0.375rem 0.75rem',
+    borderRadius: '50px',
+    fontSize: '0.875rem',
+    fontWeight: '600',
+  },
+  redeemButton: {
+    width: '100%',
+    padding: '1rem',
+    background: '#10b981',
+    color: 'white',
+    border: 'none',
+    borderRadius: '12px',
+    fontSize: '1rem',
+    fontWeight: '600',
+    cursor: 'pointer',
+    transition: 'all 0.3s',
+    marginBottom: '1rem',
+  },
+  successBox: {
+    padding: '1rem',
+    borderRadius: '10px',
+    textAlign: 'center',
+    fontWeight: '600',
+    fontSize: '0.875rem',
+  },
+  loadingBox: {
+    padding: '3rem',
+    textAlign: 'center',
+    color: '#999',
   },
 };
