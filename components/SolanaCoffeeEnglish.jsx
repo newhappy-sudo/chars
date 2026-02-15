@@ -1059,325 +1059,39 @@ function CampaignDetail({ campaign, onBack, onDonate, onRedeem, onDelete, darkMo
 }
 
 // Create Campaign Component
-function CreateCampaign({ onClose, onCreate, darkMode }) {
-  const { publicKey } = useWallet();
-  const [formData, setFormData] = useState({
-    name: '',
-    type: 'person',
-    image: '',
-    description: '',
-    goalAmount: '',
-    twitter: '',
-    telegram: '',
-    website: '',
-  });
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!publicKey) {
-      alert('Please connect your wallet first');
-      return;
-    }
-
-    const campaignId = Date.now();
-    
-    console.log('[CAMPAIGN-CREATE] Starting campaign creation, ID:', campaignId);
-    
-    try {
-      // First, generate a campaign wallet
-      console.log('[CAMPAIGN-CREATE] Step 1: Creating campaign wallet...');
-      const walletResponse = await fetch('/api/create-campaign-wallet', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          campaignId: campaignId.toString(),
-          creatorWallet: publicKey.toString()
-        })
-      });
-
-      const walletData = await walletResponse.json();
-      
-      console.log('[CAMPAIGN-CREATE] Wallet API response:', walletResponse.status, walletData);
-
-      if (!walletResponse.ok) {
-        console.error('[CAMPAIGN-CREATE] ❌ Wallet creation failed:', walletData);
-        alert(`Error creating campaign wallet: ${walletData.error || 'Unknown error'}. Please try again.`);
-        return;
-      }
-      
-      if (!walletData.campaignWallet) {
-        console.error('[CAMPAIGN-CREATE] ❌ No wallet address in response:', walletData);
-        alert('Error: No wallet address returned. Please try again.');
-        return;
-      }
-      
-      console.log('[CAMPAIGN-CREATE] ✅ Wallet created:', walletData.campaignWallet);
-
-      const newCampaign = {
-        id: campaignId,
-        ...formData,
-        avatar: formData.type === 'person' ? <i className="bi bi-person-badge"></i> : <i className="bi bi-balloon-heart"></i>,
-        walletAddress: walletData.campaignWallet, // Generated wallet instead of user wallet
-        creatorWallet: publicKey.toString(), // Store creator wallet separately
-        currentAmount: 0,
-        goalAmount: parseFloat(formData.goalAmount),
-        supporters: 0,
-        timeRemaining: '30 days',
-        urgent: false,
-        recentDonations: [],
-        approved: false, // Needs admin approval
-        fundsRedeemed: false,
-        createdAt: Date.now(),
-      };
-      
-      console.log('[CAMPAIGN-CREATE] Step 2: Saving campaign to database...');
-
-      // Save campaign to API
-      const response = await fetch('/api/create-campaign', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ campaign: newCampaign })
-      });
-
-      if (response.ok) {
-        console.log('[CAMPAIGN-CREATE] ✅ Campaign created successfully:', campaignId);
-        onCreate(newCampaign);
-        onClose();
-        alert('Campaign submitted for approval! An admin will review it shortly.');
-      } else {
-        const errorData = await response.json();
-        console.error('[CAMPAIGN-CREATE] ❌ Campaign save failed:', errorData);
-        alert(`Error creating campaign: ${errorData.error || 'Unknown error'}. Please try again.`);
-      }
-    } catch (error) {
-      console.error('[CAMPAIGN-CREATE] ❌ Exception:', error);
-      alert(`Error creating campaign: ${error.message}. Please try again.`);
-    }
-  };
-
+function CreateCampaign({ onClose }) {
   return (
-    <div style={styles.modalOverlay} onClick={onClose}>
+    <div style={{
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      background: 'rgba(0,0,0,0.9)',
+      zIndex: 99999999,
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+    }} onClick={onClose}>
       <div style={{
-        ...styles.modal,
-        background: darkMode ? '#1e293b' : 'white',
-        color: darkMode ? '#f1f5f9' : '#1A1A1A'
-      }} onClick={(e) => e.stopPropagation()} className="modal">
+        background: 'white',
+        padding: '3rem',
+        borderRadius: '20px',
+        maxWidth: '400px',
+        zIndex: 100000000,
+      }} onClick={(e) => e.stopPropagation()}>
+        <h2>Create Campaign</h2>
         <button onClick={onClose} style={{
-          ...styles.closeBtn,
-          background: darkMode ? '#334155' : '#F5F1ED',
-          color: darkMode ? '#cbd5e1' : '#666'
-        }} className="close-btn">✕</button>
-        
-        <div style={{
-          ...styles.modalHeader,
-          borderBottom: `1px solid ${darkMode ? '#334155' : '#F0EBE6'}`
+          background: 'purple',
+          color: 'white',
+          padding: '1rem 2rem',
+          border: 'none',
+          borderRadius: '10px',
+          cursor: 'pointer',
+          marginTop: '1rem',
         }}>
-          <h2 style={{
-            ...styles.modalTitle,
-            color: darkMode ? '#f1f5f9' : '#1A1A1A'
-          }}>Create a Campaign</h2>
-          <p style={{
-            ...styles.modalSubtitle,
-            color: darkMode ? '#cbd5e1' : '#666'
-          }}>Share your project with the community</p>
-        </div>
-        
-        <form onSubmit={handleSubmit} style={styles.form}>
-          <div style={styles.formGroup}>
-            <label style={{
-              ...styles.label,
-              color: darkMode ? '#f1f5f9' : '#1A1A1A'
-            }}>Name *</label>
-            <input
-              type="text"
-              value={formData.name}
-              onChange={(e) => setFormData({...formData, name: e.target.value})}
-              placeholder="Your name or organization"
-              required
-              style={{
-                ...styles.input,
-                background: darkMode ? '#334155' : 'white',
-                color: darkMode ? '#f1f5f9' : '#1A1A1A',
-                borderColor: darkMode ? '#4b5563' : '#E0E0E0'
-              }}
-            />
-          </div>
-
-          <div style={styles.formGroup}>
-            <label style={{
-              ...styles.label,
-              color: darkMode ? '#f1f5f9' : '#1A1A1A'
-            }}>Type *</label>
-            <select
-              value={formData.type}
-              onChange={(e) => setFormData({...formData, type: e.target.value})}
-              style={{
-                ...styles.input,
-                background: darkMode ? '#334155' : 'white',
-                color: darkMode ? '#f1f5f9' : '#1A1A1A',
-                borderColor: darkMode ? '#4b5563' : '#E0E0E0'
-              }}
-            >
-              <option value="person"><i className="bi bi-person-badge"></i> Person</option>
-              <option value="charity"><i className="bi bi-balloon-heart"></i> Charity</option>
-            </select>
-          </div>
-
-          <div style={styles.formGroup}>
-            <label style={{
-              ...styles.label,
-              color: darkMode ? '#f1f5f9' : '#1A1A1A'
-            }}>Photo URL *</label>
-            <input
-              type="url"
-              value={formData.image}
-              onChange={(e) => setFormData({...formData, image: e.target.value})}
-              placeholder="https://example.com/image.jpg"
-              required
-              style={{
-                ...styles.input,
-                background: darkMode ? '#334155' : 'white',
-                color: darkMode ? '#f1f5f9' : '#1A1A1A',
-                borderColor: darkMode ? '#4b5563' : '#E0E0E0'
-              }}
-            />
-            <span style={{
-              ...styles.hint,
-              color: darkMode ? '#94a3b8' : '#999'
-            }}>Link to your profile photo</span>
-          </div>
-
-          <div style={styles.formGroup}>
-            <label style={{
-              ...styles.label,
-              color: darkMode ? '#f1f5f9' : '#1A1A1A'
-            }}>Description *</label>
-            <textarea
-              value={formData.description}
-              onChange={(e) => setFormData({...formData, description: e.target.value})}
-              placeholder="Describe your project..."
-              required
-              rows="4"
-              style={{
-                ...styles.textarea,
-                background: darkMode ? '#334155' : 'white',
-                color: darkMode ? '#f1f5f9' : '#1A1A1A',
-                borderColor: darkMode ? '#4b5563' : '#E0E0E0'
-              }}
-            />
-          </div>
-
-          <div style={styles.formGroup}>
-            <label style={{
-              ...styles.label,
-              color: darkMode ? '#f1f5f9' : '#1A1A1A'
-            }}>Goal (SOL) *</label>
-            <input
-              type="number"
-              step="0.1"
-              min="1"
-              value={formData.goalAmount}
-              onChange={(e) => setFormData({...formData, goalAmount: e.target.value})}
-              placeholder="100"
-              required
-              style={{
-                ...styles.input,
-                background: darkMode ? '#334155' : 'white',
-                color: darkMode ? '#f1f5f9' : '#1A1A1A',
-                borderColor: darkMode ? '#4b5563' : '#E0E0E0'
-              }}
-            />
-          </div>
-
-          <div style={styles.formGroup}>
-            <label style={{
-              ...styles.label,
-              color: darkMode ? '#f1f5f9' : '#1A1A1A'
-            }}>Social Links (optional)</label>
-            <span style={{
-              ...styles.hint,
-              color: darkMode ? '#94a3b8' : '#999',
-              marginBottom: '0.5rem',
-              display: 'block'
-            }}>Add your social media links</span>
-          </div>
-
-          <div style={styles.formGroup}>
-            <label style={{
-              ...styles.label,
-              color: darkMode ? '#f1f5f9' : '#1A1A1A'
-            }}><i className="bi bi-twitter-x"></i> Twitter / X</label>
-            <input
-              type="url"
-              value={formData.twitter}
-              onChange={(e) => setFormData({...formData, twitter: e.target.value})}
-              placeholder="https://twitter.com/username"
-              style={{
-                ...styles.input,
-                background: darkMode ? '#334155' : 'white',
-                color: darkMode ? '#f1f5f9' : '#1A1A1A',
-                borderColor: darkMode ? '#4b5563' : '#E0E0E0'
-              }}
-            />
-          </div>
-
-          <div style={styles.formGroup}>
-            <label style={{
-              ...styles.label,
-              color: darkMode ? '#f1f5f9' : '#1A1A1A'
-            }}><i className="bi bi-telegram"></i> Telegram</label>
-            <input
-              type="url"
-              value={formData.telegram}
-              onChange={(e) => setFormData({...formData, telegram: e.target.value})}
-              placeholder="https://t.me/username"
-              style={{
-                ...styles.input,
-                background: darkMode ? '#334155' : 'white',
-                color: darkMode ? '#f1f5f9' : '#1A1A1A',
-                borderColor: darkMode ? '#4b5563' : '#E0E0E0'
-              }}
-            />
-          </div>
-
-          <div style={styles.formGroup}>
-            <label style={{
-              ...styles.label,
-              color: darkMode ? '#f1f5f9' : '#1A1A1A'
-            }}><i className="bi bi-globe"></i> Website</label>
-            <input
-              type="url"
-              value={formData.website}
-              onChange={(e) => setFormData({...formData, website: e.target.value})}
-              placeholder="https://example.com"
-              style={{
-                ...styles.input,
-                background: darkMode ? '#334155' : 'white',
-                color: darkMode ? '#f1f5f9' : '#1A1A1A',
-                borderColor: darkMode ? '#4b5563' : '#E0E0E0'
-              }}
-            />
-          </div>
-
-          {!publicKey && (
-            <div style={{
-              ...styles.walletWarning,
-              background: darkMode ? '#334155' : '#FEF3C7',
-              color: darkMode ? '#fbbf24' : '#92400E'
-            }}>
-              Connect your wallet to create a campaign
-            </div>
-          )}
-
-          <button type="submit" disabled={!publicKey} style={styles.submitBtn} className="submit-btn">
-            Submit Campaign
-          </button>
-          
-          <p style={{
-            ...styles.hint,
-            color: darkMode ? '#94a3b8' : '#999'
-          }}>Your campaign will be reviewed by an admin before going live.</p>
-        </form>
+          Close
+        </button>
       </div>
     </div>
   );
