@@ -3,21 +3,23 @@
 
 import { Keypair } from '@solana/web3.js';
 import bs58 from 'bs58';
-import pg from 'pg';
+import { getPool } from '../../lib/db.js';
+import config from '../../config.js';
 
-const { Pool } = pg;
+const pool = getPool();
 
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false }
-});
-
-const FEE_PERCENTAGE = 0.01;
-const VANITY_SUFFIX = process.env.VANITY_SUFFIX || 'SO';
-const MAX_ATTEMPTS = 50000;
+const FEE_PERCENTAGE = config.fees.platformFeePercentage;
+const VANITY_SUFFIX = config.wallet.vanitySuffix;
+const MAX_ATTEMPTS = config.wallet.vanityMaxAttempts;
+const ENABLE_VANITY = config.wallet.enableVanity;
 
 function generateVanityWallet(suffix) {
   console.log(`[VANITY] Generating wallet with suffix "${suffix}"...`);
+  
+  if (!ENABLE_VANITY) {
+    console.log('[VANITY] Vanity disabled, generating normal wallet');
+    return Keypair.generate();
+  }
   
   for (let i = 0; i < MAX_ATTEMPTS; i++) {
     const keypair = Keypair.generate();

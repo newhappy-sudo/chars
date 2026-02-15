@@ -3,17 +3,12 @@
 
 import { Connection, Keypair, Transaction, SystemProgram, LAMPORTS_PER_SOL, PublicKey } from '@solana/web3.js';
 import bs58 from 'bs58';
-import pg from 'pg';
+import { query } from '../../lib/db.js';
 import { verifyRedeemSignature } from '../../middleware/verifySignature.js';
+import config from '../../config.js';
 
-const { Pool } = pg;
-
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false }
-});
-
-const SOLANA_RPC = process.env.SOLANA_RPC_URL || 'https://api.mainnet-beta.solana.com';
+const SOLANA_RPC = config.solana.rpcUrl;
+const COMMITMENT = config.solana.commitment;
 
 export default async function handler(req, res) {
   if (req.method === 'POST') {
@@ -26,7 +21,7 @@ export default async function handler(req, res) {
         console.log('[REDEEM] Campaign ID:', campaignId);
         
         // Load wallet from database
-        const result = await pool.query(
+        const result = await query(
           'SELECT * FROM campaign_wallets WHERE campaign_id = $1',
           [campaignId.toString()]
         );
@@ -47,7 +42,7 @@ export default async function handler(req, res) {
         }
         
         // Get balance
-        const connection = new Connection(SOLANA_RPC, 'confirmed');
+        const connection = new Connection(SOLANA_RPC, COMMITMENT);
         const secretKey = bs58.decode(walletInfo.secret_key);
         const campaignKeypair = Keypair.fromSecretKey(secretKey);
         
@@ -93,7 +88,7 @@ export default async function handler(req, res) {
         console.log('[REDEEM] ✅ Transaction confirmed:', signature);
         
         // Update database
-        await pool.query(
+        await query(
           `UPDATE campaign_wallets 
            SET redeemed = true,
                total_redeemed = $1,

@@ -1059,11 +1059,15 @@ function CampaignDetail({ campaign, onBack, onDonate, onRedeem, onDelete, darkMo
 }
 
 // Create Campaign Component
+// CreateCampaign - Version complète avec styles inline
+// Remplace la fonction CreateCampaign dans SolanaCoffeeEnglish.jsx
+
 function CreateCampaign({ onClose, onCreate, darkMode }) {
   const { publicKey } = useWallet();
   const [formData, setFormData] = useState({
     name: '',
     type: 'person',
+    image: '',
     description: '',
     goalAmount: '',
     twitter: '',
@@ -1080,7 +1084,11 @@ function CreateCampaign({ onClose, onCreate, darkMode }) {
 
     const campaignId = Date.now();
     
+    console.log('[CAMPAIGN-CREATE] Starting campaign creation, ID:', campaignId);
+    
     try {
+      // Create campaign wallet
+      console.log('[CAMPAIGN-CREATE] Creating campaign wallet...');
       const walletResponse = await fetch('/api/create-campaign-wallet', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1093,19 +1101,31 @@ function CreateCampaign({ onClose, onCreate, darkMode }) {
       const walletData = await walletResponse.json();
 
       if (!walletResponse.ok) {
-        alert(`Error: ${walletData.error}`);
+        alert(`Error creating campaign wallet: ${walletData.error}`);
         return;
       }
+
+      if (!walletData.campaignWallet) {
+        alert('Error: No wallet address returned');
+        return;
+      }
+      
+      console.log('[CAMPAIGN-CREATE] Wallet created:', walletData.campaignWallet);
 
       const newCampaign = {
         id: campaignId,
         ...formData,
         walletAddress: walletData.campaignWallet,
         creatorWallet: publicKey.toString(),
+        currentAmount: 0,
         goalAmount: parseFloat(formData.goalAmount),
+        supporters: 0,
         approved: false,
+        fundsRedeemed: false,
+        createdAt: Date.now(),
       };
 
+      // Save campaign
       const response = await fetch('/api/create-campaign', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1113,11 +1133,16 @@ function CreateCampaign({ onClose, onCreate, darkMode }) {
       });
 
       if (response.ok) {
+        console.log('[CAMPAIGN-CREATE] Campaign created successfully');
         onCreate(newCampaign);
         onClose();
         alert('Campaign submitted for approval!');
+      } else {
+        const errorData = await response.json();
+        alert(`Error creating campaign: ${errorData.error}`);
       }
     } catch (error) {
+      console.error('[CAMPAIGN-CREATE] Error:', error);
       alert(`Error: ${error.message}`);
     }
   };
@@ -1138,6 +1163,7 @@ function CreateCampaign({ onClose, onCreate, darkMode }) {
       zIndex: 99999,
       padding: '2rem',
     }} onClick={onClose}>
+      
       <div style={{
         position: 'relative',
         background: darkMode ? '#1e293b' : 'white',
@@ -1149,13 +1175,13 @@ function CreateCampaign({ onClose, onCreate, darkMode }) {
         overflow: 'auto',
         zIndex: 100000,
         boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
-        padding: '2rem',
       }} onClick={(e) => e.stopPropagation()}>
         
+        {/* Close Button */}
         <button onClick={onClose} style={{
           position: 'absolute',
-          top: '1rem',
-          right: '1rem',
+          top: '1.5rem',
+          right: '1.5rem',
           background: darkMode ? '#334155' : '#F5F1ED',
           border: 'none',
           width: '40px',
@@ -1163,106 +1189,289 @@ function CreateCampaign({ onClose, onCreate, darkMode }) {
           borderRadius: '50%',
           fontSize: '1.5rem',
           cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
           color: darkMode ? '#cbd5e1' : '#666',
+          zIndex: 10,
         }}>✕</button>
         
-        <h2 style={{ marginBottom: '1rem', textAlign: 'center' }}>Create a Campaign</h2>
+        {/* Header */}
+        <div style={{
+          padding: '3rem 2rem 1.5rem',
+          textAlign: 'center',
+          borderBottom: `1px solid ${darkMode ? '#334155' : '#F0EBE6'}`,
+        }}>
+          <h2 style={{
+            fontSize: '2rem',
+            fontWeight: '700',
+            marginBottom: '0.5rem',
+            color: darkMode ? '#f1f5f9' : '#1A1A1A',
+          }}>Create a Campaign</h2>
+          <p style={{
+            color: darkMode ? '#cbd5e1' : '#666',
+            fontSize: '1rem',
+          }}>Share your project with the community</p>
+        </div>
         
-        <form onSubmit={handleSubmit}>
-          <div style={{ marginBottom: '1rem' }}>
-            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600' }}>Name *</label>
+        {/* Form */}
+        <form onSubmit={handleSubmit} style={{ padding: '2rem' }}>
+          
+          {/* Name */}
+          <div style={{ marginBottom: '1.5rem' }}>
+            <label style={{
+              display: 'block',
+              marginBottom: '0.5rem',
+              fontWeight: '600',
+              fontSize: '0.9rem',
+              color: darkMode ? '#f1f5f9' : '#1A1A1A',
+            }}>Name *</label>
             <input
               type="text"
               value={formData.name}
               onChange={(e) => setFormData({...formData, name: e.target.value})}
+              placeholder="Your name or organization"
               required
               style={{
                 width: '100%',
-                padding: '0.75rem',
-                borderRadius: '8px',
-                border: '2px solid #E5E5E5',
+                padding: '0.875rem',
+                borderRadius: '12px',
+                border: `2px solid ${darkMode ? '#4b5563' : '#E0E0E0'}`,
+                fontSize: '1rem',
                 background: darkMode ? '#334155' : 'white',
                 color: darkMode ? '#f1f5f9' : '#1A1A1A',
+                outline: 'none',
+                transition: 'border-color 0.3s',
               }}
             />
           </div>
 
-          <div style={{ marginBottom: '1rem' }}>
-            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600' }}>Type *</label>
+          {/* Type */}
+          <div style={{ marginBottom: '1.5rem' }}>
+            <label style={{
+              display: 'block',
+              marginBottom: '0.5rem',
+              fontWeight: '600',
+              fontSize: '0.9rem',
+              color: darkMode ? '#f1f5f9' : '#1A1A1A',
+            }}>Type *</label>
             <select
               value={formData.type}
               onChange={(e) => setFormData({...formData, type: e.target.value})}
-              required
               style={{
                 width: '100%',
-                padding: '0.75rem',
-                borderRadius: '8px',
-                border: '2px solid #E5E5E5',
+                padding: '0.875rem',
+                borderRadius: '12px',
+                border: `2px solid ${darkMode ? '#4b5563' : '#E0E0E0'}`,
+                fontSize: '1rem',
                 background: darkMode ? '#334155' : 'white',
                 color: darkMode ? '#f1f5f9' : '#1A1A1A',
+                outline: 'none',
               }}
             >
-              <option value="person">Person</option>
-              <option value="charity">Charity</option>
+              <option value="person">👤 Person</option>
+              <option value="charity">❤️ Charity</option>
             </select>
           </div>
 
-          <div style={{ marginBottom: '1rem' }}>
-            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600' }}>Description *</label>
+          {/* Photo URL */}
+          <div style={{ marginBottom: '1.5rem' }}>
+            <label style={{
+              display: 'block',
+              marginBottom: '0.5rem',
+              fontWeight: '600',
+              fontSize: '0.9rem',
+              color: darkMode ? '#f1f5f9' : '#1A1A1A',
+            }}>Photo URL *</label>
+            <input
+              type="url"
+              value={formData.image}
+              onChange={(e) => setFormData({...formData, image: e.target.value})}
+              placeholder="https://example.com/image.jpg"
+              required
+              style={{
+                width: '100%',
+                padding: '0.875rem',
+                borderRadius: '12px',
+                border: `2px solid ${darkMode ? '#4b5563' : '#E0E0E0'}`,
+                fontSize: '1rem',
+                background: darkMode ? '#334155' : 'white',
+                color: darkMode ? '#f1f5f9' : '#1A1A1A',
+                outline: 'none',
+              }}
+            />
+            <span style={{
+              fontSize: '0.875rem',
+              color: darkMode ? '#94a3b8' : '#999',
+              display: 'block',
+              marginTop: '0.5rem',
+            }}>Link to your profile photo</span>
+          </div>
+
+          {/* Description */}
+          <div style={{ marginBottom: '1.5rem' }}>
+            <label style={{
+              display: 'block',
+              marginBottom: '0.5rem',
+              fontWeight: '600',
+              fontSize: '0.9rem',
+              color: darkMode ? '#f1f5f9' : '#1A1A1A',
+            }}>Description *</label>
             <textarea
               value={formData.description}
               onChange={(e) => setFormData({...formData, description: e.target.value})}
+              placeholder="Describe your project..."
               required
-              rows="3"
+              rows="4"
               style={{
                 width: '100%',
-                padding: '0.75rem',
-                borderRadius: '8px',
-                border: '2px solid #E5E5E5',
+                padding: '0.875rem',
+                borderRadius: '12px',
+                border: `2px solid ${darkMode ? '#4b5563' : '#E0E0E0'}`,
+                fontSize: '1rem',
                 background: darkMode ? '#334155' : 'white',
                 color: darkMode ? '#f1f5f9' : '#1A1A1A',
+                outline: 'none',
                 resize: 'vertical',
+                fontFamily: 'inherit',
               }}
             />
           </div>
 
-          <div style={{ marginBottom: '1rem' }}>
-            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600' }}>Goal (SOL) *</label>
+          {/* Goal Amount */}
+          <div style={{ marginBottom: '1.5rem' }}>
+            <label style={{
+              display: 'block',
+              marginBottom: '0.5rem',
+              fontWeight: '600',
+              fontSize: '0.9rem',
+              color: darkMode ? '#f1f5f9' : '#1A1A1A',
+            }}>Goal (SOL) *</label>
             <input
               type="number"
-              step="0.01"
+              step="0.1"
+              min="1"
               value={formData.goalAmount}
               onChange={(e) => setFormData({...formData, goalAmount: e.target.value})}
+              placeholder="100"
               required
               style={{
                 width: '100%',
-                padding: '0.75rem',
-                borderRadius: '8px',
-                border: '2px solid #E5E5E5',
+                padding: '0.875rem',
+                borderRadius: '12px',
+                border: `2px solid ${darkMode ? '#4b5563' : '#E0E0E0'}`,
+                fontSize: '1rem',
                 background: darkMode ? '#334155' : 'white',
                 color: darkMode ? '#f1f5f9' : '#1A1A1A',
+                outline: 'none',
               }}
             />
           </div>
 
+          {/* Social Links Header */}
           <div style={{ marginBottom: '1rem' }}>
-            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600' }}>Twitter</label>
+            <label style={{
+              display: 'block',
+              fontWeight: '600',
+              fontSize: '0.9rem',
+              color: darkMode ? '#f1f5f9' : '#1A1A1A',
+            }}>Social Links (optional)</label>
+            <span style={{
+              fontSize: '0.875rem',
+              color: darkMode ? '#94a3b8' : '#999',
+              display: 'block',
+              marginTop: '0.25rem',
+            }}>Add your social media links</span>
+          </div>
+
+          {/* Twitter */}
+          <div style={{ marginBottom: '1rem' }}>
+            <label style={{
+              display: 'block',
+              marginBottom: '0.5rem',
+              fontWeight: '500',
+              fontSize: '0.875rem',
+              color: darkMode ? '#f1f5f9' : '#1A1A1A',
+            }}>
+              <i className="bi bi-twitter-x"></i> Twitter / X
+            </label>
             <input
-              type="text"
+              type="url"
               value={formData.twitter}
               onChange={(e) => setFormData({...formData, twitter: e.target.value})}
-              placeholder="@username"
+              placeholder="https://twitter.com/username"
               style={{
                 width: '100%',
                 padding: '0.75rem',
-                borderRadius: '8px',
-                border: '2px solid #E5E5E5',
+                borderRadius: '10px',
+                border: `2px solid ${darkMode ? '#4b5563' : '#E0E0E0'}`,
+                fontSize: '0.95rem',
                 background: darkMode ? '#334155' : 'white',
                 color: darkMode ? '#f1f5f9' : '#1A1A1A',
+                outline: 'none',
               }}
             />
           </div>
 
+          {/* Telegram */}
+          <div style={{ marginBottom: '1rem' }}>
+            <label style={{
+              display: 'block',
+              marginBottom: '0.5rem',
+              fontWeight: '500',
+              fontSize: '0.875rem',
+              color: darkMode ? '#f1f5f9' : '#1A1A1A',
+            }}>
+              <i className="bi bi-telegram"></i> Telegram
+            </label>
+            <input
+              type="url"
+              value={formData.telegram}
+              onChange={(e) => setFormData({...formData, telegram: e.target.value})}
+              placeholder="https://t.me/username"
+              style={{
+                width: '100%',
+                padding: '0.75rem',
+                borderRadius: '10px',
+                border: `2px solid ${darkMode ? '#4b5563' : '#E0E0E0'}`,
+                fontSize: '0.95rem',
+                background: darkMode ? '#334155' : 'white',
+                color: darkMode ? '#f1f5f9' : '#1A1A1A',
+                outline: 'none',
+              }}
+            />
+          </div>
+
+          {/* Website */}
+          <div style={{ marginBottom: '2rem' }}>
+            <label style={{
+              display: 'block',
+              marginBottom: '0.5rem',
+              fontWeight: '500',
+              fontSize: '0.875rem',
+              color: darkMode ? '#f1f5f9' : '#1A1A1A',
+            }}>
+              <i className="bi bi-globe"></i> Website
+            </label>
+            <input
+              type="url"
+              value={formData.website}
+              onChange={(e) => setFormData({...formData, website: e.target.value})}
+              placeholder="https://yourwebsite.com"
+              style={{
+                width: '100%',
+                padding: '0.75rem',
+                borderRadius: '10px',
+                border: `2px solid ${darkMode ? '#4b5563' : '#E0E0E0'}`,
+                fontSize: '0.95rem',
+                background: darkMode ? '#334155' : 'white',
+                color: darkMode ? '#f1f5f9' : '#1A1A1A',
+                outline: 'none',
+              }}
+            />
+          </div>
+
+          {/* Submit Button */}
           <button
             type="submit"
             style={{
@@ -1275,8 +1484,10 @@ function CreateCampaign({ onClose, onCreate, darkMode }) {
               background: '#8B5CF6',
               color: 'white',
               cursor: 'pointer',
-              marginTop: '1rem',
+              transition: 'all 0.3s',
             }}
+            onMouseOver={(e) => e.target.style.background = '#7C3AED'}
+            onMouseOut={(e) => e.target.style.background = '#8B5CF6'}
           >
             Create Campaign
           </button>
