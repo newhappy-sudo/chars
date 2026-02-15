@@ -5,6 +5,14 @@ export default function Document() {
   return (
     <Html lang="en">
       <Head>
+        {/* Google Fonts - Google Sans (Product Sans alternative) */}
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link
+          href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Poppins:wght@300;400;500;600;700&display=swap"
+          rel="stylesheet"
+        />
+        
         {/* Bootstrap CSS */}
         <link
           href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
@@ -20,6 +28,22 @@ export default function Document() {
         
         {/* Preconnect for performance */}
         <link rel="preconnect" href="https://cdn.jsdelivr.net" />
+        
+        {/* Custom CSS for Google Sans fallback */}
+        <style>{`
+          /* Google Sans fallback using system fonts */
+          @font-face {
+            font-family: 'Google Sans';
+            src: local('Inter'), local('Poppins'), local('-apple-system'), local('BlinkMacSystemFont');
+            font-weight: 400;
+            font-style: normal;
+            font-display: swap;
+          }
+          
+          body {
+            font-family: 'Inter', 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+          }
+        `}</style>
       </Head>
       <body>
         <Main />

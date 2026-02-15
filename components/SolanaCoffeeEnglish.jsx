@@ -3191,7 +3191,7 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    zIndex: 1000,
+    zIndex: 9999,
     padding: '2rem',
   },
   modal: {
@@ -3203,6 +3203,7 @@ const styles = {
     overflow: 'auto',
     position: 'relative',
     boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+    zIndex: 10000,  // Ajouter cette ligne
   },
   closeBtn: {
     position: 'absolute',
