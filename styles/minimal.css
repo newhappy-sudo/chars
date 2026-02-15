@@ -195,6 +195,11 @@ body.dark-mode {
   transform: translateY(-2px);
   box-shadow: 0 15px 40px rgba(124, 58, 237, 0.4);
   background: var(--primary-dark);
+  z-index: 1;
+}
+
+body:not(.dark-mode) .btn-primary {
+  box-shadow: 0 8px 20px rgba(124, 58, 237, 0.25) !important;
 }
 
 .donate-btn:hover {
@@ -204,6 +209,40 @@ body.dark-mode {
 
 .redeem-btn:hover {
   background: #059669;
+  transform: scale(1.05);
+}
+
+/* Social Icons */
+.social-icon {
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.social-icon:hover {
+  color: var(--primary) !important;
+  transform: scale(1.1);
+}
+
+.edit-socials-btn:hover {
+  background: var(--primary) !important;
+  color: white !important;
+  transform: translateY(-2px);
+}
+
+body.dark-mode .edit-socials-btn:hover {
+  background: var(--primary) !important;
+  color: white !important;
+}
+
+/* Tabs */
+.tab-button:hover {
+  background: rgba(124, 58, 237, 0.1) !important;
+}
+
+.post-comment-btn:hover:not(:disabled) {
+  background: var(--primary-dark);
   transform: scale(1.05);
 }
 
@@ -388,21 +427,12 @@ body.dark-mode .wallet-adapter-button:hover:not([disabled]) {
   }
   
   .detail-image-section {
-    position: relative !important;
-    top: auto !important;
-    order: 2;
-    margin-top: 2rem;
-  }
-  
-  /* Image plus petite sur mobile */
-  .detail-image-section > div {
-    padding-top: 60% !important;
+    display: none !important;
   }
 }
 
 @media (max-width: 480px) {
-  /* Image encore plus petite sur très petit écran */
-  .detail-image-section > div {
-    padding-top: 50% !important;
+  .detail-image-section {
+    display: none !important;
   }
 }

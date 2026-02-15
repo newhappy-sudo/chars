@@ -4,6 +4,37 @@ import { WalletAdapterNetwork } from '@solana/wallet-adapter-base';
 import { PhantomWalletAdapter, SolflareWalletAdapter } from '@solana/wallet-adapter-wallets';
 import { WalletModalProvider, WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 import { clusterApiUrl, PublicKey, Transaction, SystemProgram, LAMPORTS_PER_SOL } from '@solana/web3.js';
+import config from '../config.js';
+
+// ===================================
+// 🔧 CONFIGURATION - FROM config.js
+// ===================================
+
+// SOLANA
+const SOLANA_RPC = config.solana.rpcUrl;
+const TRANSACTION_RPC = config.solana.transactionRpcUrl;
+const NETWORK = config.solana.network;
+
+// WALLET & FEES
+const ADMIN_WALLET = config.wallet.adminWallet;
+const PLATFORM_FEE_PERCENTAGE = config.fees.platformFeePercentage;
+const VANITY_SUFFIX = config.wallet.vanitySuffix;
+const ENABLE_VANITY = config.wallet.enableVanity;
+
+// SYNC
+const SYNC_INTERVAL = config.sync.intervalMs;
+
+// UI
+const QUICK_AMOUNTS = config.ui.quickDonationAmounts;
+const MODAL_CLOSE_DELAY = config.ui.modalAutoCloseDelay;
+const DEFAULT_DARK_MODE = config.ui.defaultDarkMode;
+
+// MESSAGES
+const MESSAGES = config.messages;
+
+// ===================================
+// END CONFIGURATION
+// ===================================
 
 // Import blockchain sync hook
 // Place this file in hooks/useBlockchainSync.js
@@ -56,7 +87,7 @@ function useBlockchainSync(enabled = true) {
     syncBlockchain();
     const interval = setInterval(() => {
       syncBlockchain();
-    }, 30000); // 30 seconds
+    }, SYNC_INTERVAL);
     return () => clearInterval(interval);
   }, [enabled, syncBlockchain]);
 
@@ -65,9 +96,6 @@ function useBlockchainSync(enabled = true) {
     syncNow: syncBlockchain
   };
 }
-
-// Admin wallet address - CHANGE THIS TO YOUR ADMIN WALLET
-const ADMIN_WALLET = "Dw4fA9TdY68Kune3yWpkfCp8R7JY8FaQtMyKgyU3N4Q7";
 
 // Helper function to load campaigns from API
 const loadCampaigns = async () => {
@@ -95,15 +123,75 @@ const saveCampaigns = async (campaigns) => {
 };
 
 // Admin Panel Component
-function AdminPanel({ campaigns, onUpdateCampaigns, onClose, darkMode }) {
+function AdminPanel({ campaigns, onUpdateCampaigns, onClose, darkMode, publicKey, signMessage }) {
   const [editingCampaign, setEditingCampaign] = useState(null);
 
   const handleDelete = async (campaignId) => {
-    if (!confirm('Are you sure you want to delete this campaign?')) return;
+    if (!confirm('Are you sure you want to delete this campaign? This will also delete the associated wallet.')) return;
     
-    const updated = campaigns.filter(c => c.id !== campaignId);
-    await saveCampaigns(updated);
-    onUpdateCampaigns(updated);
+    if (!publicKey) {
+      alert('Please connect your wallet');
+      return;
+    }
+
+    if (!signMessage) {
+      alert('Your wallet does not support message signing');
+      return;
+    }
+    
+    try {
+      console.log('[ADMIN-DELETE] Requesting signature...');
+
+      // Create message to sign
+      const timestamp = Date.now();
+      const message = `Delete Campaign\nCampaign ID: ${campaignId}\nTimestamp: ${timestamp}\nWallet: ${publicKey.toString()}`;
+      
+      // Request signature
+      const messageBytes = new TextEncoder().encode(message);
+      let signature;
+      
+      try {
+        const signatureUint8 = await signMessage(messageBytes);
+        const bs58 = await import('bs58');
+        signature = bs58.default.encode(signatureUint8);
+        console.log('[ADMIN-DELETE] ✅ Signature obtained');
+      } catch (signError) {
+        console.error('[ADMIN-DELETE] Signature rejected:', signError);
+        alert('Signature rejected. Deletion cancelled.');
+        return;
+      }
+
+      // Call API to delete campaign and wallet with signature
+      const response = await fetch('/api/delete-campaign', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          campaignId,
+          walletAddress: publicKey.toString(),
+          signature: signature,
+          message: message,
+          timestamp: timestamp
+        })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log(`[ADMIN-DELETE] ✅ Campaign ${campaignId} deleted by ${data.deletedBy}`);
+        
+        // Reload campaigns from server to ensure sync
+        const freshCampaigns = await loadCampaigns();
+        onUpdateCampaigns(freshCampaigns);
+        
+        console.log(`[ADMIN-DELETE] Campaigns reloaded from server: ${freshCampaigns.length} total`);
+        alert('Campaign deleted successfully');
+      } else {
+        const error = await response.json();
+        alert(`Error deleting campaign: ${error.error}`);
+      }
+    } catch (error) {
+      console.error('Error deleting campaign:', error);
+      alert('Error deleting campaign. Please try again.');
+    }
   };
 
   const handleApprove = async (campaignId) => {
@@ -132,39 +220,74 @@ function AdminPanel({ campaigns, onUpdateCampaigns, onClose, darkMode }) {
 
   return (
     <div style={styles.modalOverlay} onClick={onClose}>
-      <div style={styles.adminPanel} onClick={(e) => e.stopPropagation()}>
-        <button onClick={onClose} style={styles.closeBtn} className="close-btn">✕</button>
+      <div style={{
+        ...styles.adminPanel,
+        background: darkMode ? '#1e293b' : 'white',
+        color: darkMode ? '#f1f5f9' : '#1A1A1A'
+      }} onClick={(e) => e.stopPropagation()}>
+        <button onClick={onClose} style={{
+          ...styles.closeBtn,
+          background: darkMode ? '#334155' : '#F5F1ED',
+          color: darkMode ? '#cbd5e1' : '#666'
+        }} className="close-btn">✕</button>
         
-        <h2 style={styles.adminTitle}>Admin Panel</h2>
+        <h2 style={{
+          ...styles.adminTitle,
+          color: darkMode ? '#f1f5f9' : '#1A1A1A'
+        }}>Admin Panel</h2>
 
         {editingCampaign ? (
           <div style={styles.editForm}>
-            <h3>Edit Campaign</h3>
+            <h3 style={{ color: darkMode ? '#f1f5f9' : '#1A1A1A' }}>Edit Campaign</h3>
             <div style={styles.formGroup}>
-              <label style={styles.label}>Name</label>
+              <label style={{
+                ...styles.label,
+                color: darkMode ? '#f1f5f9' : '#1A1A1A'
+              }}>Name</label>
               <input
                 type="text"
                 value={editingCampaign.name}
                 onChange={(e) => setEditingCampaign({...editingCampaign, name: e.target.value})}
-                style={styles.input}
+                style={{
+                  ...styles.input,
+                  background: darkMode ? '#334155' : 'white',
+                  color: darkMode ? '#f1f5f9' : '#1A1A1A',
+                  borderColor: darkMode ? '#4b5563' : '#E0E0E0'
+                }}
               />
             </div>
             <div style={styles.formGroup}>
-              <label style={styles.label}>Description</label>
+              <label style={{
+                ...styles.label,
+                color: darkMode ? '#f1f5f9' : '#1A1A1A'
+              }}>Description</label>
               <textarea
                 value={editingCampaign.description}
                 onChange={(e) => setEditingCampaign({...editingCampaign, description: e.target.value})}
-                style={styles.textarea}
+                style={{
+                  ...styles.textarea,
+                  background: darkMode ? '#334155' : 'white',
+                  color: darkMode ? '#f1f5f9' : '#1A1A1A',
+                  borderColor: darkMode ? '#4b5563' : '#E0E0E0'
+                }}
                 rows="4"
               />
             </div>
             <div style={styles.formGroup}>
-              <label style={styles.label}>Goal Amount (SOL)</label>
+              <label style={{
+                ...styles.label,
+                color: darkMode ? '#f1f5f9' : '#1A1A1A'
+              }}>Goal Amount (SOL)</label>
               <input
                 type="number"
                 value={editingCampaign.goalAmount}
                 onChange={(e) => setEditingCampaign({...editingCampaign, goalAmount: parseFloat(e.target.value)})}
-                style={styles.input}
+                style={{
+                  ...styles.input,
+                  background: darkMode ? '#334155' : 'white',
+                  color: darkMode ? '#f1f5f9' : '#1A1A1A',
+                  borderColor: darkMode ? '#4b5563' : '#E0E0E0'
+                }}
               />
             </div>
             <div style={styles.adminActions}>
@@ -175,21 +298,40 @@ function AdminPanel({ campaigns, onUpdateCampaigns, onClose, darkMode }) {
         ) : (
           <>
             <div style={styles.adminSection}>
-              <h3 style={styles.sectionSubtitle}>Pending Approval ({pendingCampaigns.length})</h3>
+              <h3 style={{
+                ...styles.sectionSubtitle,
+                color: darkMode ? '#cbd5e1' : '#374151'
+              }}>Pending Approval ({pendingCampaigns.length})</h3>
               {pendingCampaigns.length === 0 ? (
-                <p style={styles.emptyText}>No pending campaigns</p>
+                <p style={{
+                  ...styles.emptyText,
+                  color: darkMode ? '#64748b' : '#999'
+                }}>No pending campaigns</p>
               ) : (
                 <div style={styles.campaignsList}>
                   {pendingCampaigns.map(campaign => (
-                    <div key={campaign.id} style={styles.adminCard}>
+                    <div key={campaign.id} style={{
+                      ...styles.adminCard,
+                      background: darkMode ? '#0f172a' : '#F9FAFB',
+                      borderColor: darkMode ? '#334155' : '#E5E7EB'
+                    }}>
                       <div style={styles.adminCardHeader}>
                         <div>
-                          <strong>{campaign.name}</strong>
-                          <span style={styles.adminCardType}> - {campaign.type}</span>
+                          <strong style={{ color: darkMode ? '#f1f5f9' : '#1A1A1A' }}>{campaign.name}</strong>
+                          <span style={{
+                            ...styles.adminCardType,
+                            color: darkMode ? '#94a3b8' : '#6B7280'
+                          }}> - {campaign.type}</span>
                         </div>
                       </div>
-                      <p style={styles.adminCardDesc}>{campaign.description}</p>
-                      <div style={styles.adminCardInfo}>
+                      <p style={{
+                        ...styles.adminCardDesc,
+                        color: darkMode ? '#cbd5e1' : '#4B5563'
+                      }}>{campaign.description}</p>
+                      <div style={{
+                        ...styles.adminCardInfo,
+                        color: darkMode ? '#94a3b8' : '#6B7280'
+                      }}>
                         <span>Goal: {campaign.goalAmount} SOL</span>
                         <span>Wallet: {campaign.walletAddress.slice(0, 8)}...</span>
                       </div>
@@ -205,21 +347,40 @@ function AdminPanel({ campaigns, onUpdateCampaigns, onClose, darkMode }) {
             </div>
 
             <div style={styles.adminSection}>
-              <h3 style={styles.sectionSubtitle}>Active Campaigns ({approvedCampaigns.length})</h3>
+              <h3 style={{
+                ...styles.sectionSubtitle,
+                color: darkMode ? '#cbd5e1' : '#374151'
+              }}>Active Campaigns ({approvedCampaigns.length})</h3>
               {approvedCampaigns.length === 0 ? (
-                <p style={styles.emptyText}>No active campaigns</p>
+                <p style={{
+                  ...styles.emptyText,
+                  color: darkMode ? '#64748b' : '#999'
+                }}>No active campaigns</p>
               ) : (
                 <div style={styles.campaignsList}>
                   {approvedCampaigns.map(campaign => (
-                    <div key={campaign.id} style={styles.adminCard}>
+                    <div key={campaign.id} style={{
+                      ...styles.adminCard,
+                      background: darkMode ? '#0f172a' : '#F9FAFB',
+                      borderColor: darkMode ? '#334155' : '#E5E7EB'
+                    }}>
                       <div style={styles.adminCardHeader}>
                         <div>
-                          <strong>{campaign.name}</strong>
-                          <span style={styles.adminCardType}> - {campaign.type}</span>
+                          <strong style={{ color: darkMode ? '#f1f5f9' : '#1A1A1A' }}>{campaign.name}</strong>
+                          <span style={{
+                            ...styles.adminCardType,
+                            color: darkMode ? '#94a3b8' : '#6B7280'
+                          }}> - {campaign.type}</span>
                         </div>
                       </div>
-                      <p style={styles.adminCardDesc}>{campaign.description}</p>
-                      <div style={styles.adminCardInfo}>
+                      <p style={{
+                        ...styles.adminCardDesc,
+                        color: darkMode ? '#cbd5e1' : '#4B5563'
+                      }}>{campaign.description}</p>
+                      <div style={{
+                        ...styles.adminCardInfo,
+                        color: darkMode ? '#94a3b8' : '#6B7280'
+                      }}>
                         <span>Raised: {campaign.currentAmount} / {campaign.goalAmount} SOL</span>
                         <span>{campaign.supporters} supporters</span>
                       </div>
@@ -240,9 +401,139 @@ function AdminPanel({ campaigns, onUpdateCampaigns, onClose, darkMode }) {
 }
 
 // Campaign Detail Component
-function CampaignDetail({ campaign, onBack, onDonate, onRedeem, darkMode }) {
-  const { publicKey } = useWallet();
+function CampaignDetail({ campaign, onBack, onDonate, onRedeem, onDelete, darkMode, publicKey, signMessage }) {
   const isCreator = publicKey && campaign.creatorWallet && publicKey.toString() === campaign.creatorWallet;
+  const [showEditSocials, setShowEditSocials] = useState(false);
+  const [activeTab, setActiveTab] = useState('donations'); // 'donations' or 'comments'
+  const [commentText, setCommentText] = useState('');
+  const [comments, setComments] = useState([]);
+  const [loadingComment, setLoadingComment] = useState(false);
+  const [socialsData, setSocialsData] = useState({
+    twitter: campaign.twitter || '',
+    telegram: campaign.telegram || '',
+    website: campaign.website || ''
+  });
+  
+  // Scroll to top when component mounts
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
+
+  // Load comments
+  useEffect(() => {
+    const loadComments = async () => {
+      try {
+        const response = await fetch(`/api/get-comments?campaignId=${campaign.id}`);
+        const data = await response.json();
+        if (response.ok) {
+          setComments(data.comments || []);
+        }
+      } catch (error) {
+        console.error('Error loading comments:', error);
+      }
+    };
+    loadComments();
+  }, [campaign.id]);
+
+  const handlePostComment = async () => {
+    if (!publicKey) {
+      alert('Please connect your wallet to post a comment');
+      return;
+    }
+
+    if (!commentText.trim()) {
+      alert('Please enter a comment');
+      return;
+    }
+
+    try {
+      setLoadingComment(true);
+      const response = await fetch('/api/post-comment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          campaignId: campaign.id,
+          wallet: publicKey.toString(),
+          text: commentText.trim()
+        })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setComments([data.comment, ...comments]);
+        setCommentText('');
+      } else {
+        alert('Error posting comment');
+      }
+    } catch (error) {
+      console.error('Error:', error);
+      alert('Error posting comment');
+    } finally {
+      setLoadingComment(false);
+    }
+  };
+  
+  const handleSaveSocials = async () => {
+    if (!publicKey) {
+      alert('Please connect your wallet');
+      return;
+    }
+
+    if (!signMessage) {
+      alert('Your wallet does not support message signing');
+      return;
+    }
+
+    try {
+      console.log('[UPDATE-SOCIALS] Requesting signature...');
+      
+      // Request signature
+      const timestamp = Date.now();
+      const message = `Update Social Links\nCampaign ID: ${campaign.id}\nTimestamp: ${timestamp}\nWallet: ${publicKey.toString()}`;
+      
+      const messageBytes = new TextEncoder().encode(message);
+      let signature;
+      
+      try {
+        const signatureUint8 = await signMessage(messageBytes);
+        const bs58 = await import('bs58');
+        signature = bs58.default.encode(signatureUint8);
+        console.log('[UPDATE-SOCIALS] ✅ Signature obtained');
+      } catch (signError) {
+        console.error('[UPDATE-SOCIALS] Signature rejected:', signError);
+        alert('Signature rejected. Update cancelled.');
+        return;
+      }
+      
+      const response = await fetch('/api/update-campaign-socials', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          campaignId: campaign.id,
+          socials: socialsData,
+          walletAddress: publicKey.toString(),
+          signature: signature,
+          message: message,
+          timestamp: timestamp
+        })
+      });
+
+      if (response.ok) {
+        // Update local campaign data
+        campaign.twitter = socialsData.twitter;
+        campaign.telegram = socialsData.telegram;
+        campaign.website = socialsData.website;
+        setShowEditSocials(false);
+        alert('Social links updated successfully!');
+      } else {
+        const error = await response.json();
+        alert(`Error updating social links: ${error.error}`);
+      }
+    } catch (error) {
+      console.error('[UPDATE-SOCIALS] Error:', error);
+      alert('Error updating social links');
+    }
+  };
   
   const formatTime = (timestamp) => {
     const diff = Date.now() - timestamp;
@@ -279,12 +570,70 @@ function CampaignDetail({ campaign, onBack, onDonate, onRedeem, darkMode }) {
                 style={{
                   width: '100%',
                   height: '100%',
-                  objectFit: 'contain'
+                  objectFit: 'cover'
                 }}
               />
             </div>
-            <div>
-              <h1 style={styles.detailName}>{campaign.name}</h1>
+            <div style={{ flex: 1 }}>
+              <div style={{ 
+                display: 'flex', 
+                justifyContent: 'space-between', 
+                alignItems: 'flex-start',
+                marginBottom: '0.5rem'
+              }}>
+                <h1 style={styles.detailName}>{campaign.name}</h1>
+                
+                {/* Social Icons */}
+                {(campaign.twitter || campaign.telegram || campaign.website) && (
+                  <div style={{ display: 'flex', gap: '0.75rem', marginLeft: '1rem' }}>
+                    {campaign.twitter && (
+                      <a 
+                        href={campaign.twitter} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        style={{
+                          color: darkMode ? '#94a3b8' : '#666',
+                          fontSize: '1.5rem',
+                          transition: 'color 0.2s'
+                        }}
+                        className="social-icon"
+                      >
+                        <i className="bi bi-twitter-x"></i>
+                      </a>
+                    )}
+                    {campaign.telegram && (
+                      <a 
+                        href={campaign.telegram} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        style={{
+                          color: darkMode ? '#94a3b8' : '#666',
+                          fontSize: '1.5rem',
+                          transition: 'color 0.2s'
+                        }}
+                        className="social-icon"
+                      >
+                        <i className="bi bi-telegram"></i>
+                      </a>
+                    )}
+                    {campaign.website && (
+                      <a 
+                        href={campaign.website} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        style={{
+                          color: darkMode ? '#94a3b8' : '#666',
+                          fontSize: '1.5rem',
+                          transition: 'color 0.2s'
+                        }}
+                        className="social-icon"
+                      >
+                        <i className="bi bi-globe"></i>
+                      </a>
+                    )}
+                  </div>
+                )}
+              </div>
               <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
                 <span style={{
                   ...styles.detailType,
@@ -319,6 +668,33 @@ function CampaignDetail({ campaign, onBack, onDonate, onRedeem, darkMode }) {
               </div>
             </div>
           </div>
+
+          {/* Update Socials Button - Before description */}
+          {isCreator && (!campaign.twitter || !campaign.telegram || !campaign.website) && (
+            <button 
+              onClick={() => setShowEditSocials(true)} 
+              style={{
+                width: '100%',
+                padding: '0.75rem',
+                background: darkMode ? '#334155' : '#e5e7eb',
+                color: darkMode ? '#cbd5e1' : '#1f2937',
+                border: `2px solid ${darkMode ? '#4b5563' : '#d1d5db'}`,
+                borderRadius: '12px',
+                fontSize: '0.875rem',
+                fontWeight: '600',
+                cursor: 'pointer',
+                marginBottom: '1.5rem',
+                transition: 'all 0.3s',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '0.5rem'
+              }}
+              className="edit-socials-btn"
+            >
+              <i className="bi bi-link-45deg"></i> Update Social Links
+            </button>
+          )}
 
           <p style={{
             ...styles.detailDescription,
@@ -368,13 +744,15 @@ function CampaignDetail({ campaign, onBack, onDonate, onRedeem, darkMode }) {
           <div style={{
             display: 'flex',
             gap: '1rem',
-            marginBottom: '3rem'
+            marginBottom: '3rem',
+            flexWrap: 'wrap'
           }}>
             <button 
               onClick={() => onDonate(campaign)} 
               style={{
                 ...styles.detailDonateBtn,
                 flex: 1,
+                minWidth: '200px',
                 marginBottom: 0
               }} 
               className="donate-btn"
@@ -383,60 +761,299 @@ function CampaignDetail({ campaign, onBack, onDonate, onRedeem, darkMode }) {
             </button>
 
             {isCreator && (
-              <button 
-                onClick={() => onRedeem(campaign)} 
-                style={{
-                  ...styles.detailDonateBtn,
-                  background: '#10b981',
-                  flex: 1,
-                  marginBottom: 0
-                }} 
-                className="redeem-btn"
-              >
-                Redeem Funds <i className="bi bi-piggy-bank"></i>
-              </button>
+              <>
+                <button 
+                  onClick={() => onRedeem(campaign)} 
+                  style={{
+                    ...styles.detailDonateBtn,
+                    background: '#10b981',
+                    flex: 1,
+                    minWidth: '200px',
+                    marginBottom: 0
+                  }} 
+                  className="redeem-btn"
+                >
+                  Redeem Funds <i className="bi bi-piggy-bank"></i>
+                </button>
+                <button 
+                  onClick={() => onDelete && onDelete(campaign.id)} 
+                  style={{
+                    ...styles.detailDonateBtn,
+                    background: '#ef4444',
+                    flex: 1,
+                    minWidth: '200px',
+                    marginBottom: 0
+                  }} 
+                  className="delete-btn"
+                >
+                  Delete Campaign <i className="bi bi-trash"></i>
+                </button>
+              </>
             )}
           </div>
 
-          <div style={styles.recentDonations}>
-            <h3 style={styles.recentTitle}>Recent Donations</h3>
-            {campaign.recentDonations && campaign.recentDonations.length > 0 ? (
-              <div style={styles.donationsList}>
-                {campaign.recentDonations.slice(0, 5).map((donation, index) => (
-                  <div key={index} style={{
-                    ...styles.donationItem,
-                    background: darkMode ? '#1e293b' : '#F9FAFB',
-                    borderColor: darkMode ? '#334155' : '#F0EBE6'
-                  }} className="donation-item">
-                    <div style={styles.donationTop}>
-                      <span style={{
-                        ...styles.donationFrom,
-                        color: darkMode ? '#94a3b8' : '#666'
-                      }}>{donation.from}</span>
-                      <span style={styles.donationAmount}>{donation.amount} SOL</span>
-                    </div>
-                    {donation.message && (
-                      <p style={{
-                        ...styles.donationMessage,
-                        color: darkMode ? '#cbd5e1' : '#333'
-                      }}>"{donation.message}"</p>
-                    )}
-                    <span style={{
-                      ...styles.donationTime,
-                      color: darkMode ? '#64748b' : '#999'
-                    }}>{formatTime(donation.timestamp)}</span>
+          {/* Tabs Section */}
+          <div style={styles.tabsContainer}>
+            <div style={styles.tabsHeader}>
+              <button
+                onClick={() => setActiveTab('donations')}
+                style={{
+                  ...styles.tab,
+                  ...(activeTab === 'donations' ? styles.tabActive : {}),
+                  background: activeTab === 'donations' ? (darkMode ? '#334155' : '#7c3aed') : 'transparent',
+                  color: activeTab === 'donations' ? (darkMode ? '#f1f5f9' : 'white') : (darkMode ? '#94a3b8' : '#666')
+                }}
+                className="tab-button"
+              >
+                <i className="bi bi-people"></i> Recent Donators ({campaign.recentDonations?.length || 0})
+              </button>
+              <button
+                onClick={() => setActiveTab('comments')}
+                style={{
+                  ...styles.tab,
+                  ...(activeTab === 'comments' ? styles.tabActive : {}),
+                  background: activeTab === 'comments' ? (darkMode ? '#334155' : '#7c3aed') : 'transparent',
+                  color: activeTab === 'comments' ? (darkMode ? '#f1f5f9' : 'white') : (darkMode ? '#94a3b8' : '#666')
+                }}
+                className="tab-button"
+              >
+                <i className="bi bi-chat-left-text"></i> Comments ({comments.length})
+              </button>
+            </div>
+
+            {/* Donations Tab */}
+            {activeTab === 'donations' && (
+              <div style={styles.tabContent}>
+                {campaign.recentDonations && campaign.recentDonations.length > 0 ? (
+                  <div style={styles.donationsList}>
+                    {campaign.recentDonations.slice(0, 10).map((donation, index) => (
+                      <div key={index} style={{
+                        ...styles.donationItem,
+                        background: darkMode ? '#1e293b' : '#F9FAFB',
+                        borderColor: darkMode ? '#334155' : '#F0EBE6'
+                      }} className="donation-item">
+                        <div style={styles.donationTop}>
+                          <span style={{
+                            ...styles.donationFrom,
+                            color: darkMode ? '#94a3b8' : '#666'
+                          }}>{donation.from}</span>
+                          <span style={styles.donationAmount}>{donation.amount} SOL</span>
+                        </div>
+                        {donation.message && (
+                          <p style={{
+                            ...styles.donationMessage,
+                            color: darkMode ? '#cbd5e1' : '#333'
+                          }}>"{donation.message}"</p>
+                        )}
+                        <span style={{
+                          ...styles.donationTime,
+                          color: darkMode ? '#64748b' : '#999'
+                        }}>{formatTime(donation.timestamp)}</span>
+                      </div>
+                    ))}
                   </div>
-                ))}
+                ) : (
+                  <p style={{
+                    ...styles.noDonations,
+                    color: darkMode ? '#64748b' : '#999'
+                  }}>No donations yet</p>
+                )}
               </div>
-            ) : (
-              <p style={{
-                ...styles.noDonations,
-                color: darkMode ? '#64748b' : '#999'
-              }}>No donations yet</p>
+            )}
+
+            {/* Comments Tab */}
+            {activeTab === 'comments' && (
+              <div style={styles.tabContent}>
+                {/* Post Comment Box */}
+                <div style={{
+                  ...styles.commentBox,
+                  background: darkMode ? '#1e293b' : '#F9FAFB',
+                  borderColor: darkMode ? '#334155' : '#E5E7EB'
+                }}>
+                  <textarea
+                    value={commentText}
+                    onChange={(e) => setCommentText(e.target.value)}
+                    placeholder={publicKey ? "Share your thoughts..." : "Connect your wallet to comment"}
+                    disabled={!publicKey}
+                    maxLength="500"
+                    rows="3"
+                    style={{
+                      ...styles.commentInput,
+                      background: darkMode ? '#0f172a' : 'white',
+                      color: darkMode ? '#f1f5f9' : '#1A1A1A',
+                      borderColor: darkMode ? '#334155' : '#E0E0E0'
+                    }}
+                  />
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.75rem' }}>
+                    <span style={{ 
+                      fontSize: '0.75rem', 
+                      color: darkMode ? '#64748b' : '#999' 
+                    }}>
+                      {commentText.length}/500
+                    </span>
+                    <button
+                      onClick={handlePostComment}
+                      disabled={!publicKey || !commentText.trim() || loadingComment}
+                      style={{
+                        ...styles.postCommentBtn,
+                        opacity: (!publicKey || !commentText.trim() || loadingComment) ? 0.5 : 1,
+                        cursor: (!publicKey || !commentText.trim() || loadingComment) ? 'not-allowed' : 'pointer'
+                      }}
+                      className="post-comment-btn"
+                    >
+                      {loadingComment ? 'Posting...' : 'Post Comment'}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Comments List */}
+                {comments.length > 0 ? (
+                  <div style={styles.commentsList}>
+                    {comments.map((comment) => (
+                      <div key={comment.id} style={{
+                        ...styles.commentItem,
+                        background: darkMode ? '#1e293b' : '#F9FAFB',
+                        borderColor: darkMode ? '#334155' : '#F0EBE6'
+                      }}>
+                        <div style={styles.commentHeader}>
+                          <span style={{
+                            ...styles.commentWallet,
+                            color: darkMode ? '#94a3b8' : '#666'
+                          }}>
+                            {comment.wallet.slice(0, 4)}...{comment.wallet.slice(-4)}
+                          </span>
+                          <span style={{
+                            ...styles.commentTime,
+                            color: darkMode ? '#64748b' : '#999'
+                          }}>
+                            {formatTime(comment.timestamp)}
+                          </span>
+                        </div>
+                        <p style={{
+                          ...styles.commentText,
+                          color: darkMode ? '#cbd5e1' : '#333'
+                        }}>{comment.text}</p>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p style={{
+                    ...styles.noDonations,
+                    color: darkMode ? '#64748b' : '#999'
+                  }}>No comments yet. Be the first to comment!</p>
+                )}
+              </div>
             )}
           </div>
         </div>
       </div>
+
+      {/* Edit Socials Modal */}
+      {showEditSocials && (
+        <div style={styles.modalOverlay} onClick={() => setShowEditSocials(false)}>
+          <div style={{
+            ...styles.modal,
+            background: darkMode ? '#1e293b' : 'white',
+            color: darkMode ? '#f1f5f9' : '#1A1A1A'
+          }} onClick={(e) => e.stopPropagation()} className="modal">
+            <button onClick={() => setShowEditSocials(false)} style={{
+              ...styles.closeBtn,
+              background: darkMode ? '#334155' : '#F5F1ED',
+              color: darkMode ? '#cbd5e1' : '#666'
+            }} className="close-btn">✕</button>
+            
+            <div style={{
+              ...styles.modalHeader,
+              borderBottom: `1px solid ${darkMode ? '#334155' : '#F0EBE6'}`
+            }}>
+              <h2 style={{
+                ...styles.modalTitle,
+                color: darkMode ? '#f1f5f9' : '#1A1A1A'
+              }}>Edit Social Links</h2>
+              <p style={{
+                ...styles.modalSubtitle,
+                color: darkMode ? '#cbd5e1' : '#666'
+              }}>Update your campaign's social media</p>
+            </div>
+            
+            <div style={styles.modalBody}>
+              <div style={styles.formGroup}>
+                <label style={{
+                  ...styles.label,
+                  color: darkMode ? '#f1f5f9' : '#1A1A1A'
+                }}><i className="bi bi-twitter-x"></i> Twitter / X {campaign.twitter && <span style={{ fontSize: '0.75rem', color: '#10b981' }}>✓ Added</span>}</label>
+                <input
+                  type="url"
+                  value={socialsData.twitter}
+                  onChange={(e) => setSocialsData({...socialsData, twitter: e.target.value})}
+                  placeholder="https://twitter.com/username"
+                  disabled={!!campaign.twitter}
+                  style={{
+                    ...styles.input,
+                    background: campaign.twitter ? (darkMode ? '#1e293b' : '#f3f4f6') : (darkMode ? '#334155' : 'white'),
+                    color: campaign.twitter ? (darkMode ? '#64748b' : '#9ca3af') : (darkMode ? '#f1f5f9' : '#1A1A1A'),
+                    borderColor: darkMode ? '#4b5563' : '#E0E0E0',
+                    cursor: campaign.twitter ? 'not-allowed' : 'text'
+                  }}
+                />
+              </div>
+
+              <div style={styles.formGroup}>
+                <label style={{
+                  ...styles.label,
+                  color: darkMode ? '#f1f5f9' : '#1A1A1A'
+                }}><i className="bi bi-telegram"></i> Telegram {campaign.telegram && <span style={{ fontSize: '0.75rem', color: '#10b981' }}>✓ Added</span>}</label>
+                <input
+                  type="url"
+                  value={socialsData.telegram}
+                  onChange={(e) => setSocialsData({...socialsData, telegram: e.target.value})}
+                  placeholder="https://t.me/username"
+                  disabled={!!campaign.telegram}
+                  style={{
+                    ...styles.input,
+                    background: campaign.telegram ? (darkMode ? '#1e293b' : '#f3f4f6') : (darkMode ? '#334155' : 'white'),
+                    color: campaign.telegram ? (darkMode ? '#64748b' : '#9ca3af') : (darkMode ? '#f1f5f9' : '#1A1A1A'),
+                    borderColor: darkMode ? '#4b5563' : '#E0E0E0',
+                    cursor: campaign.telegram ? 'not-allowed' : 'text'
+                  }}
+                />
+              </div>
+
+              <div style={styles.formGroup}>
+                <label style={{
+                  ...styles.label,
+                  color: darkMode ? '#f1f5f9' : '#1A1A1A'
+                }}><i className="bi bi-globe"></i> Website {campaign.website && <span style={{ fontSize: '0.75rem', color: '#10b981' }}>✓ Added</span>}</label>
+                <input
+                  type="url"
+                  value={socialsData.website}
+                  onChange={(e) => setSocialsData({...socialsData, website: e.target.value})}
+                  placeholder="https://example.com"
+                  disabled={!!campaign.website}
+                  style={{
+                    ...styles.input,
+                    background: campaign.website ? (darkMode ? '#1e293b' : '#f3f4f6') : (darkMode ? '#334155' : 'white'),
+                    color: campaign.website ? (darkMode ? '#64748b' : '#9ca3af') : (darkMode ? '#f1f5f9' : '#1A1A1A'),
+                    borderColor: darkMode ? '#4b5563' : '#E0E0E0',
+                    cursor: campaign.website ? 'not-allowed' : 'text'
+                  }}
+                />
+              </div>
+
+              <button
+                onClick={handleSaveSocials}
+                style={{
+                  ...styles.submitBtn,
+                  marginTop: '1rem'
+                }}
+                className="submit-btn"
+              >
+                Save Changes
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -450,6 +1067,9 @@ function CreateCampaign({ onClose, onCreate, darkMode }) {
     image: '',
     description: '',
     goalAmount: '',
+    twitter: '',
+    telegram: '',
+    website: '',
   });
 
   const handleSubmit = async (e) => {
@@ -461,53 +1081,77 @@ function CreateCampaign({ onClose, onCreate, darkMode }) {
 
     const campaignId = Date.now();
     
-    // First, generate a campaign wallet
-    const walletResponse = await fetch('/api/create-campaign-wallet', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ 
-        campaignId: campaignId.toString(),
-        creatorWallet: publicKey.toString()
-      })
-    });
+    console.log('[CAMPAIGN-CREATE] Starting campaign creation, ID:', campaignId);
+    
+    try {
+      // First, generate a campaign wallet
+      console.log('[CAMPAIGN-CREATE] Step 1: Creating campaign wallet...');
+      const walletResponse = await fetch('/api/create-campaign-wallet', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          campaignId: campaignId.toString(),
+          creatorWallet: publicKey.toString()
+        })
+      });
 
-    const walletData = await walletResponse.json();
+      const walletData = await walletResponse.json();
+      
+      console.log('[CAMPAIGN-CREATE] Wallet API response:', walletResponse.status, walletData);
 
-    if (!walletResponse.ok) {
-      alert('Error creating campaign wallet. Please try again.');
-      return;
-    }
+      if (!walletResponse.ok) {
+        console.error('[CAMPAIGN-CREATE] ❌ Wallet creation failed:', walletData);
+        alert(`Error creating campaign wallet: ${walletData.error || 'Unknown error'}. Please try again.`);
+        return;
+      }
+      
+      if (!walletData.campaignWallet) {
+        console.error('[CAMPAIGN-CREATE] ❌ No wallet address in response:', walletData);
+        alert('Error: No wallet address returned. Please try again.');
+        return;
+      }
+      
+      console.log('[CAMPAIGN-CREATE] ✅ Wallet created:', walletData.campaignWallet);
 
-    const newCampaign = {
-      id: campaignId,
-      ...formData,
-      avatar: formData.type === 'person' ? <i className="bi bi-person-badge"></i> : <i className="bi bi-balloon-heart"></i>,
-      walletAddress: walletData.campaignWallet, // Generated wallet instead of user wallet
-      creatorWallet: publicKey.toString(), // Store creator wallet separately
-      currentAmount: 0,
-      goalAmount: parseFloat(formData.goalAmount),
-      supporters: 0,
-      timeRemaining: '30 days',
-      urgent: false,
-      recentDonations: [],
-      approved: false, // Needs admin approval
-      fundsRedeemed: false,
-      createdAt: Date.now(),
-    };
+      const newCampaign = {
+        id: campaignId,
+        ...formData,
+        avatar: formData.type === 'person' ? <i className="bi bi-person-badge"></i> : <i className="bi bi-balloon-heart"></i>,
+        walletAddress: walletData.campaignWallet, // Generated wallet instead of user wallet
+        creatorWallet: publicKey.toString(), // Store creator wallet separately
+        currentAmount: 0,
+        goalAmount: parseFloat(formData.goalAmount),
+        supporters: 0,
+        timeRemaining: '30 days',
+        urgent: false,
+        recentDonations: [],
+        approved: false, // Needs admin approval
+        fundsRedeemed: false,
+        createdAt: Date.now(),
+      };
+      
+      console.log('[CAMPAIGN-CREATE] Step 2: Saving campaign to database...');
 
-    // Save campaign to API
-    const response = await fetch('/api/create-campaign', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ campaign: newCampaign })
-    });
+      // Save campaign to API
+      const response = await fetch('/api/create-campaign', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ campaign: newCampaign })
+      });
 
-    if (response.ok) {
-      onCreate(newCampaign);
-      onClose();
-      alert('Campaign submitted for approval! An admin will review it shortly.');
-    } else {
-      alert('Error creating campaign. Please try again.');
+      if (response.ok) {
+        console.log('[CAMPAIGN-CREATE] ✅ Campaign created successfully:', campaignId);
+        onCreate(newCampaign);
+        onClose();
+        alert('Campaign submitted for approval! An admin will review it shortly.');
+      } else {
+        const errorData = await response.json();
+        console.error('[CAMPAIGN-CREATE] ❌ Campaign save failed:', errorData);
+        alert(`Error creating campaign: ${errorData.error || 'Unknown error'}. Please try again.`);
+      }
+    } catch (error) {
+      console.error('[CAMPAIGN-CREATE] ❌ Exception:', error);
+      alert(`Error creating campaign: ${error.message}. Please try again.`);
     }
   };
 
@@ -645,6 +1289,76 @@ function CreateCampaign({ onClose, onCreate, darkMode }) {
             />
           </div>
 
+          <div style={styles.formGroup}>
+            <label style={{
+              ...styles.label,
+              color: darkMode ? '#f1f5f9' : '#1A1A1A'
+            }}>Social Links (optional)</label>
+            <span style={{
+              ...styles.hint,
+              color: darkMode ? '#94a3b8' : '#999',
+              marginBottom: '0.5rem',
+              display: 'block'
+            }}>Add your social media links</span>
+          </div>
+
+          <div style={styles.formGroup}>
+            <label style={{
+              ...styles.label,
+              color: darkMode ? '#f1f5f9' : '#1A1A1A'
+            }}><i className="bi bi-twitter-x"></i> Twitter / X</label>
+            <input
+              type="url"
+              value={formData.twitter}
+              onChange={(e) => setFormData({...formData, twitter: e.target.value})}
+              placeholder="https://twitter.com/username"
+              style={{
+                ...styles.input,
+                background: darkMode ? '#334155' : 'white',
+                color: darkMode ? '#f1f5f9' : '#1A1A1A',
+                borderColor: darkMode ? '#4b5563' : '#E0E0E0'
+              }}
+            />
+          </div>
+
+          <div style={styles.formGroup}>
+            <label style={{
+              ...styles.label,
+              color: darkMode ? '#f1f5f9' : '#1A1A1A'
+            }}><i className="bi bi-telegram"></i> Telegram</label>
+            <input
+              type="url"
+              value={formData.telegram}
+              onChange={(e) => setFormData({...formData, telegram: e.target.value})}
+              placeholder="https://t.me/username"
+              style={{
+                ...styles.input,
+                background: darkMode ? '#334155' : 'white',
+                color: darkMode ? '#f1f5f9' : '#1A1A1A',
+                borderColor: darkMode ? '#4b5563' : '#E0E0E0'
+              }}
+            />
+          </div>
+
+          <div style={styles.formGroup}>
+            <label style={{
+              ...styles.label,
+              color: darkMode ? '#f1f5f9' : '#1A1A1A'
+            }}><i className="bi bi-globe"></i> Website</label>
+            <input
+              type="url"
+              value={formData.website}
+              onChange={(e) => setFormData({...formData, website: e.target.value})}
+              placeholder="https://example.com"
+              style={{
+                ...styles.input,
+                background: darkMode ? '#334155' : 'white',
+                color: darkMode ? '#f1f5f9' : '#1A1A1A',
+                borderColor: darkMode ? '#4b5563' : '#E0E0E0'
+              }}
+            />
+          </div>
+
           {!publicKey && (
             <div style={{
               ...styles.walletWarning,
@@ -671,14 +1385,11 @@ function CreateCampaign({ onClose, onCreate, darkMode }) {
 
 // Donation Modal Component
 function DonationModal({ campaign, onClose, onSuccess, darkMode }) {
-  const { connection } = useConnection();
   const { publicKey, sendTransaction } = useWallet();
   const [amount, setAmount] = useState('');
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState('');
-
-  const quickAmounts = [0.1, 0.5, 1, 2, 5];
 
   const handleDonate = async () => {
     if (!publicKey) {
@@ -693,48 +1404,66 @@ function DonationModal({ campaign, onClose, onSuccess, darkMode }) {
 
     try {
       setLoading(true);
-      setStatus('Processing transaction...');
+      setStatus('Preparing transaction...');
 
-      // Créer la transaction de transfert simple
-      const recipientPubkey = new PublicKey(campaign.walletAddress);
+      console.log('Starting donation:', {
+        from: publicKey.toString(),
+        to: campaign.walletAddress,
+        amount: parseFloat(amount),
+        rpc: TRANSACTION_RPC
+      });
+
+      // Create direct connection to Transaction RPC (from config)
+      const { Connection } = await import('@solana/web3.js');
+      const connection = new Connection(TRANSACTION_RPC, 'confirmed');
       
-      const transaction = new Transaction().add(
+      console.log('Using RPC:', TRANSACTION_RPC);
+
+      // Get latest blockhash
+      const { blockhash } = await connection.getLatestBlockhash('confirmed');
+      
+      console.log('Got blockhash:', blockhash);
+
+      // Simple SOL transfer
+      const lamports = Math.floor(parseFloat(amount) * LAMPORTS_PER_SOL);
+      
+      const transaction = new Transaction({
+        recentBlockhash: blockhash,
+        feePayer: publicKey,
+      }).add(
         SystemProgram.transfer({
           fromPubkey: publicKey,
-          toPubkey: recipientPubkey,
-          lamports: Math.floor(parseFloat(amount) * LAMPORTS_PER_SOL),
+          toPubkey: new PublicKey(campaign.walletAddress),
+          lamports: lamports,
         })
       );
 
-      // Envoyer la transaction
-      const signature = await sendTransaction(transaction, connection, {
-        skipPreflight: false,
-        preflightCommitment: 'confirmed',
-      });
+      console.log('Sending transaction...');
+      setStatus('Sending transaction...');
 
-      setStatus('Confirming transaction...');
+      // Send transaction
+      const signature = await sendTransaction(transaction, connection);
 
-      // Attendre la confirmation
-      const confirmation = await connection.confirmTransaction(signature, 'confirmed');
+      console.log('Transaction sent! Signature:', signature);
       
-      if (confirmation.value.err) {
-        throw new Error('Transaction failed');
-      }
-      
-      setStatus(`Donation sent! Thank you for your support`);
+      setStatus(`Transaction sent successfully! Signature: ${signature.slice(0, 8)}...`);
 
-      // Note: Campaign stats will be updated automatically by blockchain sync (every 30 seconds)
-      // Or you can manually trigger sync if you want instant update
-      
+      // Don't wait for confirmation - let blockchain sync handle it
       if (onSuccess) onSuccess();
 
       setTimeout(() => {
         onClose();
-      }, 2000);
+      }, MODAL_CLOSE_DELAY);
       
     } catch (error) {
-      console.error('Error:', error);
-      setStatus(`Error: ${error.message || 'Transaction failed'}`);
+      console.error('Donation error:', error);
+      
+      // Check if it's a user rejection
+      if (error.message?.includes('User rejected')) {
+        setStatus('Transaction cancelled');
+      } else {
+        setStatus(`Error: ${error.message || 'Transaction failed. Please try again.'}`);
+      }
     } finally {
       setLoading(false);
     }
@@ -764,7 +1493,7 @@ function DonationModal({ campaign, onClose, onSuccess, darkMode }) {
               style={{
                 width: '100%',
                 height: '100%',
-                objectFit: 'contain'
+                objectFit: 'cover'
               }}
             />
           </div>
@@ -803,7 +1532,7 @@ function DonationModal({ campaign, onClose, onSuccess, darkMode }) {
           </div>
 
           <div style={styles.quickAmounts}>
-            {quickAmounts.map(amt => (
+            {QUICK_AMOUNTS.map(amt => (
               <button
                 key={amt}
                 onClick={() => setAmount(amt.toString())}
@@ -981,7 +1710,7 @@ function RedeemFundsModal({ campaign, onClose, onSuccess, darkMode }) {
               style={{
                 width: '100%',
                 height: '100%',
-                objectFit: 'contain'
+                objectFit: 'cover'
               }}
             />
           </div>
@@ -1179,15 +1908,76 @@ function CampaignCard({ campaign, onView, onDonate, darkMode }) {
             style={{
               width: '100%',
               height: '100%',
-              objectFit: 'contain'
+              objectFit: 'cover'
             }}
           />
         </div>
         <div style={styles.cardInfo}>
-          <div style={{
-            ...styles.cardName,
-            color: darkMode ? '#f1f5f9' : '#1A1A1A'
-          }}>{campaign.name}</div>
+          <div style={{ 
+            display: 'flex', 
+            justifyContent: 'space-between', 
+            alignItems: 'flex-start',
+            marginBottom: '0.25rem'
+          }}>
+            <div style={{
+              ...styles.cardName,
+              color: darkMode ? '#f1f5f9' : '#1A1A1A'
+            }}>{campaign.name}</div>
+            
+            {/* Social Icons */}
+            {(campaign.twitter || campaign.telegram || campaign.website) && (
+              <div style={{ display: 'flex', gap: '0.5rem', marginLeft: '0.5rem' }}>
+                {campaign.twitter && (
+                  <a 
+                    href={campaign.twitter} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    style={{
+                      color: darkMode ? '#94a3b8' : '#666',
+                      fontSize: '1.1rem',
+                      transition: 'color 0.2s'
+                    }}
+                    className="social-icon"
+                  >
+                    <i className="bi bi-twitter-x"></i>
+                  </a>
+                )}
+                {campaign.telegram && (
+                  <a 
+                    href={campaign.telegram} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    style={{
+                      color: darkMode ? '#94a3b8' : '#666',
+                      fontSize: '1.1rem',
+                      transition: 'color 0.2s'
+                    }}
+                    className="social-icon"
+                  >
+                    <i className="bi bi-telegram"></i>
+                  </a>
+                )}
+                {campaign.website && (
+                  <a 
+                    href={campaign.website} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    style={{
+                      color: darkMode ? '#94a3b8' : '#666',
+                      fontSize: '1.1rem',
+                      transition: 'color 0.2s'
+                    }}
+                    className="social-icon"
+                  >
+                    <i className="bi bi-globe"></i>
+                  </a>
+                )}
+              </div>
+            )}
+          </div>
           <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
             <span style={{
               ...styles.cardType,
@@ -1272,7 +2062,7 @@ function CampaignCard({ campaign, onView, onDonate, darkMode }) {
 
 // Main App Component
 function CoffeeCampaignsApp() {
-  const { publicKey } = useWallet();
+  const { publicKey, signMessage } = useWallet();
   const [campaigns, setCampaigns] = useState([]);
   const [filter, setFilter] = useState('all');
   const [selectedCampaign, setSelectedCampaign] = useState(null);
@@ -1281,7 +2071,7 @@ function CoffeeCampaignsApp() {
   const [showRedeem, setShowRedeem] = useState(null);
   const [showAdmin, setShowAdmin] = useState(false);
   const [view, setView] = useState('grid');
-  const [darkMode, setDarkMode] = useState(false);
+  const [darkMode, setDarkMode] = useState(DEFAULT_DARK_MODE);
 
   // Enable blockchain sync - automatically checks every 30 seconds
   const { syncStatus, syncNow } = useBlockchainSync(true);
@@ -1309,6 +2099,84 @@ function CoffeeCampaignsApp() {
 
   // Check if current wallet is admin
   const isAdmin = publicKey?.toString() === ADMIN_WALLET;
+
+  // Handle campaign deletion with wallet signature
+  const handleDeleteCampaign = async (campaignId) => {
+    if (!publicKey) {
+      alert('Please connect your wallet');
+      return;
+    }
+
+    if (!signMessage) {
+      alert('Your wallet does not support message signing. Please use Phantom or Solflare.');
+      return;
+    }
+
+    if (!confirm('Are you sure you want to delete this campaign? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      console.log('[DELETE] Requesting signature from wallet...');
+
+      // Create message to sign
+      const timestamp = Date.now();
+      const message = `Delete Campaign\nCampaign ID: ${campaignId}\nTimestamp: ${timestamp}\nWallet: ${publicKey.toString()}`;
+      
+      // Request signature from wallet
+      const messageBytes = new TextEncoder().encode(message);
+      let signature;
+      
+      try {
+        const signatureUint8 = await signMessage(messageBytes);
+        
+        // Convert signature to base58
+        const bs58 = await import('bs58');
+        signature = bs58.default.encode(signatureUint8);
+        
+        console.log('[DELETE] ✅ Signature obtained');
+      } catch (signError) {
+        console.error('[DELETE] Signature rejected:', signError);
+        alert('Signature rejected. Campaign deletion cancelled.');
+        return;
+      }
+
+      // Send delete request with signature
+      const response = await fetch('/api/delete-campaign', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          campaignId,
+          walletAddress: publicKey.toString(),
+          signature: signature,
+          message: message,
+          timestamp: timestamp
+        })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log(`[DELETE] ✅ Campaign deleted by ${data.deletedBy}`);
+        
+        // Reload campaigns from server to ensure sync
+        const freshCampaigns = await loadCampaigns();
+        setCampaigns(freshCampaigns);
+        
+        console.log(`[DELETE] Campaigns reloaded from server: ${freshCampaigns.length} total`);
+        
+        // Go back to campaign list
+        setSelectedCampaign(null);
+        
+        alert('Campaign deleted successfully');
+      } else {
+        const error = await response.json();
+        alert(`Error: ${error.error}`);
+      }
+    } catch (error) {
+      console.error('Error deleting campaign:', error);
+      alert('Error deleting campaign. Please try again.');
+    }
+  };
 
   const approvedCampaigns = campaigns.filter(c => c.approved);
 
@@ -1349,7 +2217,10 @@ function CoffeeCampaignsApp() {
           onBack={handleBack}
           onDonate={(c) => setShowDonate(c)}
           onRedeem={(c) => setShowRedeem(c)}
+          onDelete={handleDeleteCampaign}
           darkMode={darkMode}
+          publicKey={publicKey}
+          signMessage={signMessage}
         />
         {showDonate && (
           <DonationModal 
@@ -1586,6 +2457,8 @@ function CoffeeCampaignsApp() {
           onUpdateCampaigns={setCampaigns}
           onClose={() => setShowAdmin(false)}
           darkMode={darkMode}
+          publicKey={publicKey}
+          signMessage={signMessage}
         />
       )}
     </div>
@@ -1594,8 +2467,7 @@ function CoffeeCampaignsApp() {
 
 // App with Providers
 export default function App() {
-  const network = WalletAdapterNetwork.Devnet;
-  const endpoint = useMemo(() => clusterApiUrl(network), [network]);
+  const endpoint = useMemo(() => SOLANA_RPC, []);
 
   const wallets = useMemo(
     () => [new PhantomWalletAdapter(), new SolflareWalletAdapter()],
@@ -1745,8 +2617,9 @@ const styles = {
   screenLogo: {
     width: '80px',
     height: '80px',
-    objectFit: 'contain',
+    objectFit: 'cover',
     marginBottom: '1rem',
+    borderRadius: '8px',
   },
   coffeeIcon: {
     fontSize: '4rem',
@@ -2211,6 +3084,100 @@ const styles = {
     fontStyle: 'italic',
     textAlign: 'center',
     padding: '2rem',
+  },
+  
+  // Tabs
+  tabsContainer: {
+    marginTop: '3rem',
+    borderTop: '2px solid #F0EBE6',
+    paddingTop: '2rem',
+  },
+  tabsHeader: {
+    display: 'flex',
+    gap: '1rem',
+    marginBottom: '2rem',
+    borderBottom: '2px solid #F0EBE6',
+  },
+  tab: {
+    flex: 1,
+    padding: '1rem',
+    background: 'transparent',
+    border: 'none',
+    borderBottom: '3px solid transparent',
+    fontSize: '0.95rem',
+    fontWeight: '600',
+    cursor: 'pointer',
+    transition: 'all 0.3s',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '0.5rem',
+    borderRadius: '8px 8px 0 0',
+  },
+  tabActive: {
+    borderBottomColor: '#7c3aed',
+  },
+  tabContent: {
+    minHeight: '300px',
+  },
+  
+  // Comments
+  commentBox: {
+    padding: '1.5rem',
+    borderRadius: '12px',
+    border: '1px solid #E5E7EB',
+    marginBottom: '2rem',
+  },
+  commentInput: {
+    width: '100%',
+    padding: '0.75rem',
+    border: '2px solid #E0E0E0',
+    borderRadius: '8px',
+    fontSize: '0.95rem',
+    fontFamily: 'inherit',
+    resize: 'vertical',
+    minHeight: '80px',
+  },
+  postCommentBtn: {
+    padding: '0.625rem 1.5rem',
+    background: '#7c3aed',
+    color: 'white',
+    border: 'none',
+    borderRadius: '8px',
+    fontSize: '0.875rem',
+    fontWeight: '600',
+    cursor: 'pointer',
+    transition: 'all 0.3s',
+  },
+  commentsList: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '1rem',
+  },
+  commentItem: {
+    padding: '1.25rem',
+    background: '#F9FAFB',
+    borderRadius: '12px',
+    border: '1px solid #F0EBE6',
+  },
+  commentHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: '0.75rem',
+  },
+  commentWallet: {
+    fontSize: '0.875rem',
+    fontFamily: 'monospace',
+    fontWeight: '600',
+  },
+  commentTime: {
+    fontSize: '0.75rem',
+  },
+  commentText: {
+    fontSize: '0.95rem',
+    lineHeight: '1.6',
+    whiteSpace: 'pre-wrap',
   },
   
   // Modals

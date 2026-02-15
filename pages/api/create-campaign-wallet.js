@@ -1,65 +1,73 @@
 // pages/api/create-campaign-wallet.js
+// Create campaign wallet and store in PostgreSQL
+
 import { Keypair } from '@solana/web3.js';
-import fs from 'fs';
-import path from 'path';
 import bs58 from 'bs58';
+import pg from 'pg';
 
-const WALLETS_FILE = path.join(process.cwd(), 'data', 'campaign-wallets.json');
+const { Pool } = pg;
 
-// Admin fee wallet - REPLACE WITH YOUR WALLET
-const FEE_WALLET = "Dw4fA9TdY68Kune3yWpkfCp8R7JY8FaQtMyKgyU3N4Q7";
-const FEE_PERCENTAGE = 0.01; // 1%
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false }
+});
 
-function ensureWalletsFile() {
-  const dataDir = path.join(process.cwd(), 'data');
-  if (!fs.existsSync(dataDir)) {
-    fs.mkdirSync(dataDir, { recursive: true });
+const FEE_PERCENTAGE = 0.01;
+const VANITY_SUFFIX = process.env.VANITY_SUFFIX || 'SO';
+const MAX_ATTEMPTS = 50000;
+
+function generateVanityWallet(suffix) {
+  console.log(`[VANITY] Generating wallet with suffix "${suffix}"...`);
+  
+  for (let i = 0; i < MAX_ATTEMPTS; i++) {
+    const keypair = Keypair.generate();
+    const publicKey = keypair.publicKey.toString();
+    
+    if (publicKey.endsWith(suffix)) {
+      console.log(`[VANITY] ✅ Found after ${i + 1} attempts`);
+      return keypair;
+    }
   }
-  if (!fs.existsSync(WALLETS_FILE)) {
-    fs.writeFileSync(WALLETS_FILE, JSON.stringify({ wallets: {} }));
-  }
+  
+  throw new Error(`Could not generate vanity address after ${MAX_ATTEMPTS} attempts`);
 }
 
-export default function handler(req, res) {
+export default async function handler(req, res) {
   if (req.method === 'POST') {
     try {
-      ensureWalletsFile();
-      
       const { campaignId, creatorWallet } = req.body;
       
-      // Generate new keypair for this campaign
-      const keypair = Keypair.generate();
+      if (!campaignId || !creatorWallet) {
+        return res.status(400).json({ error: 'Missing campaignId or creatorWallet' });
+      }
+      
+      console.log('[CREATE-WALLET] Creating wallet for campaign:', campaignId);
+      
+      // Generate vanity wallet
+      const keypair = generateVanityWallet(VANITY_SUFFIX);
       const publicKey = keypair.publicKey.toString();
       const secretKey = bs58.encode(keypair.secretKey);
       
-      // Load existing wallets
-      const data = fs.readFileSync(WALLETS_FILE, 'utf8');
-      const walletsData = JSON.parse(data);
+      // Insert into database
+      await pool.query(
+        `INSERT INTO campaign_wallets 
+         (campaign_id, campaign_wallet, secret_key, creator_wallet, last_balance, total_received, fees_collected)
+         VALUES ($1, $2, $3, $4, 0, 0, 0)
+         ON CONFLICT (campaign_id) DO NOTHING`,
+        [campaignId, publicKey, secretKey, creatorWallet]
+      );
       
-      // Store wallet info
-      walletsData.wallets[campaignId] = {
-        campaignWallet: publicKey,
-        secretKey: secretKey, // ENCRYPTED in production!
-        creatorWallet: creatorWallet,
-        totalReceived: 0,
-        totalRedeemed: 0,
-        feesCollected: 0,
-        createdAt: Date.now(),
-        redeemed: false
-      };
+      console.log('[CREATE-WALLET] ✅ Wallet created:', publicKey);
       
-      // Save
-      fs.writeFileSync(WALLETS_FILE, JSON.stringify(walletsData, null, 2));
-      
-      res.status(200).json({ 
+      res.status(200).json({
         success: true,
         campaignWallet: publicKey,
         feePercentage: FEE_PERCENTAGE
       });
       
     } catch (error) {
-      console.error('Error creating campaign wallet:', error);
-      res.status(500).json({ error: 'Failed to create campaign wallet' });
+      console.error('[CREATE-WALLET] ❌ Error:', error);
+      res.status(500).json({ error: error.message || 'Failed to create wallet' });
     }
   } else {
     res.status(405).json({ error: 'Method not allowed' });

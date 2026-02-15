@@ -1,0 +1,32 @@
+{
+  "comments": [
+    {
+      "id": "1770939556688",
+      "campaignId": 1770936633583,
+      "wallet": "Dw4fA9TdY68Kune3yWpkfCp8R7JY8FaQtMyKgyU3N4Q7",
+      "text": "<script>alert(\"test\")</script>",
+      "timestamp": 1770939556688
+    },
+    {
+      "id": "1770939541172",
+      "campaignId": 1770936633583,
+      "wallet": "Dw4fA9TdY68Kune3yWpkfCp8R7JY8FaQtMyKgyU3N4Q7",
+      "text": "ds<fsdf",
+      "timestamp": 1770939541172
+    },
+    {
+      "id": "1770939539972",
+      "campaignId": 1770936633583,
+      "wallet": "Dw4fA9TdY68Kune3yWpkfCp8R7JY8FaQtMyKgyU3N4Q7",
+      "text": "dsf",
+      "timestamp": 1770939539972
+    },
+    {
+      "id": "1770939537246",
+      "campaignId": 1770936633583,
+      "wallet": "Dw4fA9TdY68Kune3yWpkfCp8R7JY8FaQtMyKgyU3N4Q7",
+      "text": "test",
+      "timestamp": 1770939537246
+    }
+  ]
+}
