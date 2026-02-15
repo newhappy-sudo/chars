@@ -6,20 +6,32 @@ import { query } from '../../lib/db.js';
 export default async function handler(req, res) {
   if (req.method === 'POST') {
     try {
-      const { campaignId, walletAddress, comment } = req.body;
+      // Support both formats: frontend sends 'wallet' and 'text'
+      const { 
+        campaignId, 
+        walletAddress, 
+        wallet,  // Frontend sends 'wallet'
+        comment, 
+        text     // Frontend sends 'text'
+      } = req.body;
+      
+      // Use whichever format is provided
+      const finalWallet = walletAddress || wallet;
+      const finalComment = comment || text;
       
       // Validation
-      if (!campaignId || !walletAddress || !comment) {
+      if (!campaignId || !finalWallet || !finalComment) {
+        console.log('[POST-COMMENT] Missing fields:', { campaignId, finalWallet, finalComment });
         return res.status(400).json({ 
-          error: 'Missing required fields: campaignId, walletAddress, comment' 
+          error: 'Missing required fields: campaignId, wallet, text' 
         });
       }
       
-      if (comment.trim().length === 0) {
+      if (finalComment.trim().length === 0) {
         return res.status(400).json({ error: 'Comment cannot be empty' });
       }
       
-      if (comment.length > 500) {
+      if (finalComment.length > 500) {
         return res.status(400).json({ error: 'Comment too long (max 500 characters)' });
       }
       
@@ -41,7 +53,7 @@ export default async function handler(req, res) {
          (campaign_id, wallet_address, comment_text, created_at)
          VALUES ($1, $2, $3, NOW())
          RETURNING *`,
-        [campaignId, walletAddress, comment.trim()]
+        [campaignId, finalWallet, finalComment.trim()]
       );
       
       console.log('[POST-COMMENT] ✅ Comment posted');
