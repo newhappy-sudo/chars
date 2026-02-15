@@ -1059,7 +1059,69 @@ function CampaignDetail({ campaign, onBack, onDonate, onRedeem, onDelete, darkMo
 }
 
 // Create Campaign Component
-function CreateCampaign({ onClose }) {
+function CreateCampaign({ onClose, onCreate, darkMode }) {
+  const { publicKey } = useWallet();
+  const [formData, setFormData] = useState({
+    name: '',
+    type: 'person',
+    description: '',
+    goalAmount: '',
+    twitter: '',
+    telegram: '',
+    website: '',
+  });
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!publicKey) {
+      alert('Please connect your wallet first');
+      return;
+    }
+
+    const campaignId = Date.now();
+    
+    try {
+      const walletResponse = await fetch('/api/create-campaign-wallet', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          campaignId: campaignId.toString(),
+          creatorWallet: publicKey.toString()
+        })
+      });
+
+      const walletData = await walletResponse.json();
+
+      if (!walletResponse.ok) {
+        alert(`Error: ${walletData.error}`);
+        return;
+      }
+
+      const newCampaign = {
+        id: campaignId,
+        ...formData,
+        walletAddress: walletData.campaignWallet,
+        creatorWallet: publicKey.toString(),
+        goalAmount: parseFloat(formData.goalAmount),
+        approved: false,
+      };
+
+      const response = await fetch('/api/create-campaign', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newCampaign)
+      });
+
+      if (response.ok) {
+        onCreate(newCampaign);
+        onClose();
+        alert('Campaign submitted for approval!');
+      }
+    } catch (error) {
+      alert(`Error: ${error.message}`);
+    }
+  };
+
   return (
     <div style={{
       position: 'fixed',
@@ -1067,31 +1129,158 @@ function CreateCampaign({ onClose }) {
       left: 0,
       right: 0,
       bottom: 0,
-      background: 'rgba(0,0,0,0.9)',
-      zIndex: 99999999,
+      width: '100vw',
+      height: '100vh',
+      background: 'rgba(0, 0, 0, 0.7)',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
+      zIndex: 99999,
+      padding: '2rem',
     }} onClick={onClose}>
       <div style={{
-        background: 'white',
-        padding: '3rem',
-        borderRadius: '20px',
-        maxWidth: '400px',
-        zIndex: 100000000,
+        position: 'relative',
+        background: darkMode ? '#1e293b' : 'white',
+        color: darkMode ? '#f1f5f9' : '#1A1A1A',
+        borderRadius: '24px',
+        maxWidth: '500px',
+        width: '100%',
+        maxHeight: '90vh',
+        overflow: 'auto',
+        zIndex: 100000,
+        boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
+        padding: '2rem',
       }} onClick={(e) => e.stopPropagation()}>
-        <h2>Create Campaign</h2>
+        
         <button onClick={onClose} style={{
-          background: 'purple',
-          color: 'white',
-          padding: '1rem 2rem',
+          position: 'absolute',
+          top: '1rem',
+          right: '1rem',
+          background: darkMode ? '#334155' : '#F5F1ED',
           border: 'none',
-          borderRadius: '10px',
+          width: '40px',
+          height: '40px',
+          borderRadius: '50%',
+          fontSize: '1.5rem',
           cursor: 'pointer',
-          marginTop: '1rem',
-        }}>
-          Close
-        </button>
+          color: darkMode ? '#cbd5e1' : '#666',
+        }}>✕</button>
+        
+        <h2 style={{ marginBottom: '1rem', textAlign: 'center' }}>Create a Campaign</h2>
+        
+        <form onSubmit={handleSubmit}>
+          <div style={{ marginBottom: '1rem' }}>
+            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600' }}>Name *</label>
+            <input
+              type="text"
+              value={formData.name}
+              onChange={(e) => setFormData({...formData, name: e.target.value})}
+              required
+              style={{
+                width: '100%',
+                padding: '0.75rem',
+                borderRadius: '8px',
+                border: '2px solid #E5E5E5',
+                background: darkMode ? '#334155' : 'white',
+                color: darkMode ? '#f1f5f9' : '#1A1A1A',
+              }}
+            />
+          </div>
+
+          <div style={{ marginBottom: '1rem' }}>
+            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600' }}>Type *</label>
+            <select
+              value={formData.type}
+              onChange={(e) => setFormData({...formData, type: e.target.value})}
+              required
+              style={{
+                width: '100%',
+                padding: '0.75rem',
+                borderRadius: '8px',
+                border: '2px solid #E5E5E5',
+                background: darkMode ? '#334155' : 'white',
+                color: darkMode ? '#f1f5f9' : '#1A1A1A',
+              }}
+            >
+              <option value="person">Person</option>
+              <option value="charity">Charity</option>
+            </select>
+          </div>
+
+          <div style={{ marginBottom: '1rem' }}>
+            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600' }}>Description *</label>
+            <textarea
+              value={formData.description}
+              onChange={(e) => setFormData({...formData, description: e.target.value})}
+              required
+              rows="3"
+              style={{
+                width: '100%',
+                padding: '0.75rem',
+                borderRadius: '8px',
+                border: '2px solid #E5E5E5',
+                background: darkMode ? '#334155' : 'white',
+                color: darkMode ? '#f1f5f9' : '#1A1A1A',
+                resize: 'vertical',
+              }}
+            />
+          </div>
+
+          <div style={{ marginBottom: '1rem' }}>
+            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600' }}>Goal (SOL) *</label>
+            <input
+              type="number"
+              step="0.01"
+              value={formData.goalAmount}
+              onChange={(e) => setFormData({...formData, goalAmount: e.target.value})}
+              required
+              style={{
+                width: '100%',
+                padding: '0.75rem',
+                borderRadius: '8px',
+                border: '2px solid #E5E5E5',
+                background: darkMode ? '#334155' : 'white',
+                color: darkMode ? '#f1f5f9' : '#1A1A1A',
+              }}
+            />
+          </div>
+
+          <div style={{ marginBottom: '1rem' }}>
+            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600' }}>Twitter</label>
+            <input
+              type="text"
+              value={formData.twitter}
+              onChange={(e) => setFormData({...formData, twitter: e.target.value})}
+              placeholder="@username"
+              style={{
+                width: '100%',
+                padding: '0.75rem',
+                borderRadius: '8px',
+                border: '2px solid #E5E5E5',
+                background: darkMode ? '#334155' : 'white',
+                color: darkMode ? '#f1f5f9' : '#1A1A1A',
+              }}
+            />
+          </div>
+
+          <button
+            type="submit"
+            style={{
+              width: '100%',
+              padding: '1rem',
+              fontSize: '1.125rem',
+              fontWeight: '600',
+              borderRadius: '12px',
+              border: 'none',
+              background: '#8B5CF6',
+              color: 'white',
+              cursor: 'pointer',
+              marginTop: '1rem',
+            }}
+          >
+            Create Campaign
+          </button>
+        </form>
       </div>
     </div>
   );
