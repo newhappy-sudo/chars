@@ -628,11 +628,13 @@ function AdminPanel({ campaigns, onUpdateCampaigns, onClose, darkMode, publicKey
   );
 }
 
-// Campaign Detail Component
+// Campaign Detail Component - COMPLET AVEC TOUS LES FIXES
+// Remplacer toute la fonction CampaignDetail dans SolanaCoffeeEnglish.jsx
+
 function CampaignDetail({ campaign, onBack, onDonate, onRedeem, onDelete, darkMode, publicKey, signMessage }) {
   const isCreator = publicKey && campaign.creatorWallet && publicKey.toString() === campaign.creatorWallet;
   const [showEditSocials, setShowEditSocials] = useState(false);
-  const [activeTab, setActiveTab] = useState('donations'); // 'donations' or 'comments'
+  const [activeTab, setActiveTab] = useState('donations');
   const [commentText, setCommentText] = useState('');
   const [comments, setComments] = useState([]);
   const [loadingComment, setLoadingComment] = useState(false);
@@ -715,7 +717,6 @@ function CampaignDetail({ campaign, onBack, onDonate, onRedeem, onDelete, darkMo
     try {
       console.log('[UPDATE-SOCIALS] Requesting signature...');
       
-      // Request signature
       const timestamp = Date.now();
       const message = `Update Social Links\nCampaign ID: ${campaign.id}\nTimestamp: ${timestamp}\nWallet: ${publicKey.toString()}`;
       
@@ -747,7 +748,6 @@ function CampaignDetail({ campaign, onBack, onDonate, onRedeem, onDelete, darkMo
       });
 
       if (response.ok) {
-        // Update local campaign data
         campaign.twitter = socialsData.twitter;
         campaign.telegram = socialsData.telegram;
         campaign.website = socialsData.website;
@@ -874,7 +874,6 @@ function CampaignDetail({ campaign, onBack, onDonate, onRedeem, onDelete, darkMo
                   )}
                 </span>
                 
-                {/* Redeem Status Badge */}
                 {campaign.fundsRedeemed !== undefined && (
                   <span style={{
                     ...styles.detailType,
@@ -896,33 +895,6 @@ function CampaignDetail({ campaign, onBack, onDonate, onRedeem, onDelete, darkMo
               </div>
             </div>
           </div>
-
-          {/* Update Socials Button - Before description */}
-          {isCreator && (!campaign.twitter || !campaign.telegram || !campaign.website) && (
-            <button 
-              onClick={() => setShowEditSocials(true)} 
-              style={{
-                width: '100%',
-                padding: '0.75rem',
-                background: darkMode ? '#334155' : '#e5e7eb',
-                color: darkMode ? '#cbd5e1' : '#1f2937',
-                border: `2px solid ${darkMode ? '#4b5563' : '#d1d5db'}`,
-                borderRadius: '12px',
-                fontSize: '0.875rem',
-                fontWeight: '600',
-                cursor: 'pointer',
-                marginBottom: '1.5rem',
-                transition: 'all 0.3s',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '0.5rem'
-              }}
-              className="edit-socials-btn"
-            >
-              <i className="bi bi-link-45deg"></i> Update Social Links
-            </button>
-          )}
 
           <p style={{
             ...styles.detailDescription,
@@ -969,67 +941,193 @@ function CampaignDetail({ campaign, onBack, onDonate, onRedeem, onDelete, darkMo
             </div>
           </div>
 
+          {/* Update Socials Button */}
+          {publicKey && campaign.creatorWallet && 
+           publicKey.toString() === campaign.creatorWallet &&
+           (!campaign.twitter || !campaign.telegram || !campaign.website) && (
+            <button 
+              onClick={() => {
+                console.log('[UPDATE-SOCIALS] Button clicked');
+                setShowEditSocials(true);
+              }}
+              style={{
+                width: '100%',
+                padding: '0.75rem',
+                background: darkMode ? '#334155' : '#e5e7eb',
+                color: darkMode ? '#cbd5e1' : '#1f2937',
+                border: `2px solid ${darkMode ? '#4b5563' : '#d1d5db'}`,
+                borderRadius: '12px',
+                fontSize: '0.875rem',
+                fontWeight: '600',
+                cursor: 'pointer',
+                marginBottom: '1.5rem',
+                transition: 'all 0.3s',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '0.5rem'
+              }}
+            >
+              <i className="bi bi-link-45deg"></i> Update Social Links
+            </button>
+          )}
+
+          {/* Action Buttons */}
           <div style={{
             display: 'flex',
             gap: '1rem',
             marginBottom: '3rem',
             flexWrap: 'wrap'
           }}>
+            
+            {/* Donate Button */}
             <button 
-              onClick={() => onDonate(campaign)} 
+              onClick={() => {
+                console.log('[DONATE] Button clicked, campaign:', campaign.id);
+                if (onDonate) {
+                  onDonate(campaign);
+                } else {
+                  console.error('[DONATE] onDonate is not defined');
+                }
+              }}
               style={{
-                ...styles.detailDonateBtn,
                 flex: 1,
                 minWidth: '200px',
-                marginBottom: 0
-              }} 
+                padding: '1.25rem',
+                background: '#7c3aed',
+                color: 'white',
+                border: 'none',
+                borderRadius: '12px',
+                fontSize: '1.125rem',
+                fontWeight: '600',
+                cursor: 'pointer',
+                marginBottom: 0,
+                boxShadow: '0 10px 30px rgba(124, 58, 237, 0.3)',
+                transition: 'all 0.3s',
+              }}
+              onMouseOver={(e) => {
+                e.target.style.transform = 'translateY(-2px)';
+                e.target.style.boxShadow = '0 15px 40px rgba(124, 58, 237, 0.4)';
+              }}
+              onMouseOut={(e) => {
+                e.target.style.transform = 'translateY(0)';
+                e.target.style.boxShadow = '0 10px 30px rgba(124, 58, 237, 0.3)';
+              }}
               className="donate-btn"
             >
               Make a Donation <i className="bi bi-balloon-heart"></i>
             </button>
 
-            {isCreator && (
-              <>
-                <button 
-                  onClick={() => onRedeem(campaign)} 
-                  style={{
-                    ...styles.detailDonateBtn,
-                    background: '#10b981',
-                    flex: 1,
-                    minWidth: '200px',
-                    marginBottom: 0
-                  }} 
-                  className="redeem-btn"
-                >
-                  Redeem Funds <i className="bi bi-piggy-bank"></i>
-                </button>
-                <button 
-                  onClick={() => onDelete && onDelete(campaign.id)} 
-                  style={{
-                    ...styles.detailDonateBtn,
-                    background: '#ef4444',
-                    flex: 1,
-                    minWidth: '200px',
-                    marginBottom: 0
-                  }} 
-                  className="delete-btn"
-                >
-                  Delete Campaign <i className="bi bi-trash"></i>
-                </button>
-              </>
+            {/* Redeem Button */}
+            {publicKey && campaign.creatorWallet && 
+             publicKey.toString() === campaign.creatorWallet && (
+              <button 
+                onClick={() => {
+                  console.log('[REDEEM] Button clicked, campaign:', campaign.id);
+                  if (onRedeem) {
+                    onRedeem(campaign);
+                  } else {
+                    console.error('[REDEEM] onRedeem is not defined');
+                  }
+                }}
+                style={{
+                  flex: 1,
+                  minWidth: '200px',
+                  padding: '1.25rem',
+                  background: '#10b981',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '12px',
+                  fontSize: '1.125rem',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  marginBottom: 0,
+                  boxShadow: '0 10px 30px rgba(16, 185, 129, 0.3)',
+                  transition: 'all 0.3s',
+                }}
+                onMouseOver={(e) => {
+                  e.target.style.transform = 'translateY(-2px)';
+                  e.target.style.boxShadow = '0 15px 40px rgba(16, 185, 129, 0.4)';
+                }}
+                onMouseOut={(e) => {
+                  e.target.style.transform = 'translateY(0)';
+                  e.target.style.boxShadow = '0 10px 30px rgba(16, 185, 129, 0.3)';
+                }}
+                className="redeem-btn"
+              >
+                Redeem Funds <i className="bi bi-piggy-bank"></i>
+              </button>
+            )}
+
+            {/* Delete Button */}
+            {publicKey && campaign.creatorWallet && 
+             publicKey.toString() === campaign.creatorWallet && (
+              <button 
+                onClick={() => {
+                  console.log('[DELETE] Button clicked, campaign:', campaign.id);
+                  if (onDelete) {
+                    onDelete(campaign.id);
+                  } else {
+                    console.error('[DELETE] onDelete is not defined');
+                  }
+                }}
+                style={{
+                  padding: '1.25rem',
+                  background: '#ef4444',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '12px',
+                  fontSize: '1.125rem',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  marginBottom: 0,
+                  transition: 'all 0.3s',
+                }}
+                onMouseOver={(e) => {
+                  e.target.style.transform = 'translateY(-2px)';
+                  e.target.style.background = '#dc2626';
+                }}
+                onMouseOut={(e) => {
+                  e.target.style.transform = 'translateY(0)';
+                  e.target.style.background = '#ef4444';
+                }}
+                className="delete-btn"
+              >
+                Delete Campaign <i className="bi bi-trash"></i>
+              </button>
             )}
           </div>
 
           {/* Tabs Section */}
-          <div style={styles.tabsContainer}>
-            <div style={styles.tabsHeader}>
+          <div style={{
+            marginTop: '3rem',
+            borderTop: `2px solid ${darkMode ? '#334155' : '#F0EBE6'}`,
+            paddingTop: '2rem',
+          }}>
+            <div style={{
+              display: 'flex',
+              gap: '1rem',
+              marginBottom: '2rem',
+              borderBottom: `2px solid ${darkMode ? '#334155' : '#F0EBE6'}`,
+            }}>
               <button
                 onClick={() => setActiveTab('donations')}
                 style={{
-                  ...styles.tab,
-                  ...(activeTab === 'donations' ? styles.tabActive : {}),
+                  flex: 1,
+                  padding: '1rem',
                   background: activeTab === 'donations' ? (darkMode ? '#334155' : '#7c3aed') : 'transparent',
-                  color: activeTab === 'donations' ? (darkMode ? '#f1f5f9' : 'white') : (darkMode ? '#94a3b8' : '#666')
+                  color: activeTab === 'donations' ? (darkMode ? '#f1f5f9' : 'white') : (darkMode ? '#94a3b8' : '#666'),
+                  border: 'none',
+                  borderBottom: `3px solid ${activeTab === 'donations' ? '#7c3aed' : 'transparent'}`,
+                  fontSize: '0.95rem',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  transition: 'all 0.3s',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.5rem',
+                  borderRadius: '8px 8px 0 0',
                 }}
                 className="tab-button"
               >
@@ -1038,10 +1136,21 @@ function CampaignDetail({ campaign, onBack, onDonate, onRedeem, onDelete, darkMo
               <button
                 onClick={() => setActiveTab('comments')}
                 style={{
-                  ...styles.tab,
-                  ...(activeTab === 'comments' ? styles.tabActive : {}),
+                  flex: 1,
+                  padding: '1rem',
                   background: activeTab === 'comments' ? (darkMode ? '#334155' : '#7c3aed') : 'transparent',
-                  color: activeTab === 'comments' ? (darkMode ? '#f1f5f9' : 'white') : (darkMode ? '#94a3b8' : '#666')
+                  color: activeTab === 'comments' ? (darkMode ? '#f1f5f9' : 'white') : (darkMode ? '#94a3b8' : '#666'),
+                  border: 'none',
+                  borderBottom: `3px solid ${activeTab === 'comments' ? '#7c3aed' : 'transparent'}`,
+                  fontSize: '0.95rem',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  transition: 'all 0.3s',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.5rem',
+                  borderRadius: '8px 8px 0 0',
                 }}
                 className="tab-button"
               >
@@ -1051,39 +1160,61 @@ function CampaignDetail({ campaign, onBack, onDonate, onRedeem, onDelete, darkMo
 
             {/* Donations Tab */}
             {activeTab === 'donations' && (
-              <div style={styles.tabContent}>
+              <div style={{ minHeight: '300px' }}>
                 {campaign.recentDonations && campaign.recentDonations.length > 0 ? (
-                  <div style={styles.donationsList}>
+                  <div style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '1rem',
+                  }}>
                     {campaign.recentDonations.slice(0, 10).map((donation, index) => (
                       <div key={index} style={{
-                        ...styles.donationItem,
+                        padding: '1.25rem',
                         background: darkMode ? '#1e293b' : '#F9FAFB',
-                        borderColor: darkMode ? '#334155' : '#F0EBE6'
+                        borderRadius: '12px',
+                        border: `1px solid ${darkMode ? '#334155' : '#F0EBE6'}`,
+                        transition: 'all 0.3s',
                       }} className="donation-item">
-                        <div style={styles.donationTop}>
+                        <div style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          marginBottom: '0.5rem',
+                          alignItems: 'center',
+                        }}>
                           <span style={{
-                            ...styles.donationFrom,
-                            color: darkMode ? '#94a3b8' : '#666'
+                            fontSize: '0.875rem',
+                            fontFamily: 'monospace',
+                            color: darkMode ? '#94a3b8' : '#666',
                           }}>{donation.from}</span>
-                          <span style={styles.donationAmount}>{donation.amount} SOL</span>
+                          <span style={{
+                            fontSize: '1rem',
+                            fontWeight: '700',
+                            color: '#7c3aed',
+                          }}>{donation.amount} SOL</span>
                         </div>
                         {donation.message && (
                           <p style={{
-                            ...styles.donationMessage,
-                            color: darkMode ? '#cbd5e1' : '#333'
+                            fontSize: '0.9375rem',
+                            fontStyle: 'italic',
+                            color: darkMode ? '#cbd5e1' : '#333',
+                            margin: '0.75rem 0',
+                            lineHeight: '1.6',
                           }}>"{donation.message}"</p>
                         )}
                         <span style={{
-                          ...styles.donationTime,
-                          color: darkMode ? '#64748b' : '#999'
+                          fontSize: '0.75rem',
+                          color: darkMode ? '#64748b' : '#999',
                         }}>{formatTime(donation.timestamp)}</span>
                       </div>
                     ))}
                   </div>
                 ) : (
                   <p style={{
-                    ...styles.noDonations,
-                    color: darkMode ? '#64748b' : '#999'
+                    fontSize: '0.9375rem',
+                    color: darkMode ? '#64748b' : '#999',
+                    fontStyle: 'italic',
+                    textAlign: 'center',
+                    padding: '2rem',
                   }}>No donations yet</p>
                 )}
               </div>
@@ -1091,28 +1222,41 @@ function CampaignDetail({ campaign, onBack, onDonate, onRedeem, onDelete, darkMo
 
             {/* Comments Tab */}
             {activeTab === 'comments' && (
-              <div style={styles.tabContent}>
+              <div style={{ minHeight: '300px' }}>
                 {/* Post Comment Box */}
                 <div style={{
-                  ...styles.commentBox,
+                  padding: '1.5rem',
+                  borderRadius: '12px',
+                  border: `1px solid ${darkMode ? '#334155' : '#E5E7EB'}`,
+                  marginBottom: '2rem',
                   background: darkMode ? '#1e293b' : '#F9FAFB',
-                  borderColor: darkMode ? '#334155' : '#E5E7EB'
                 }}>
                   <textarea
                     value={commentText}
                     onChange={(e) => setCommentText(e.target.value)}
                     placeholder={publicKey ? "Share your thoughts..." : "Connect your wallet to comment"}
                     disabled={!publicKey}
-                    maxLength="500"
-                    rows="3"
+                    maxLength={500}
+                    rows={3}
                     style={{
-                      ...styles.commentInput,
+                      width: '100%',
+                      padding: '0.75rem',
+                      border: `2px solid ${darkMode ? '#334155' : '#E0E0E0'}`,
+                      borderRadius: '8px',
+                      fontSize: '0.95rem',
+                      fontFamily: 'inherit',
+                      resize: 'vertical',
+                      minHeight: '80px',
                       background: darkMode ? '#0f172a' : 'white',
                       color: darkMode ? '#f1f5f9' : '#1A1A1A',
-                      borderColor: darkMode ? '#334155' : '#E0E0E0'
                     }}
                   />
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.75rem' }}>
+                  <div style={{ 
+                    display: 'flex', 
+                    justifyContent: 'space-between', 
+                    alignItems: 'center', 
+                    marginTop: '0.75rem' 
+                  }}>
                     <span style={{ 
                       fontSize: '0.75rem', 
                       color: darkMode ? '#64748b' : '#999' 
@@ -1123,9 +1267,16 @@ function CampaignDetail({ campaign, onBack, onDonate, onRedeem, onDelete, darkMo
                       onClick={handlePostComment}
                       disabled={!publicKey || !commentText.trim() || loadingComment}
                       style={{
-                        ...styles.postCommentBtn,
+                        padding: '0.625rem 1.5rem',
+                        background: '#7c3aed',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '8px',
+                        fontSize: '0.875rem',
+                        fontWeight: '600',
+                        cursor: (!publicKey || !commentText.trim() || loadingComment) ? 'not-allowed' : 'pointer',
+                        transition: 'all 0.3s',
                         opacity: (!publicKey || !commentText.trim() || loadingComment) ? 0.5 : 1,
-                        cursor: (!publicKey || !commentText.trim() || loadingComment) ? 'not-allowed' : 'pointer'
                       }}
                       className="post-comment-btn"
                     >
@@ -1136,38 +1287,65 @@ function CampaignDetail({ campaign, onBack, onDonate, onRedeem, onDelete, darkMo
 
                 {/* Comments List */}
                 {comments.length > 0 ? (
-                  <div style={styles.commentsList}>
+                  <div style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '1rem',
+                  }}>
                     {comments.map((comment) => (
                       <div key={comment.id} style={{
-                        ...styles.commentItem,
+                        padding: '1.25rem',
                         background: darkMode ? '#1e293b' : '#F9FAFB',
-                        borderColor: darkMode ? '#334155' : '#F0EBE6'
+                        borderRadius: '12px',
+                        border: `1px solid ${darkMode ? '#334155' : '#F0EBE6'}`,
                       }}>
-                        <div style={styles.commentHeader}>
+                        <div style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          marginBottom: '0.75rem',
+                        }}>
                           <span style={{
-                            ...styles.commentWallet,
-                            color: darkMode ? '#94a3b8' : '#666'
+                            fontSize: '0.875rem',
+                            fontFamily: 'monospace',
+                            fontWeight: '600',
+                            color: darkMode ? '#94a3b8' : '#666',
                           }}>
-                            {comment.wallet.slice(0, 4)}...{comment.wallet.slice(-4)}
+                            {comment.wallet_address ? 
+                              `${comment.wallet_address.slice(0, 4)}...${comment.wallet_address.slice(-4)}` :
+                              comment.wallet ?
+                              `${comment.wallet.slice(0, 4)}...${comment.wallet.slice(-4)}` :
+                              'Anonymous'
+                            }
                           </span>
                           <span style={{
-                            ...styles.commentTime,
-                            color: darkMode ? '#64748b' : '#999'
+                            fontSize: '0.75rem',
+                            color: darkMode ? '#64748b' : '#999',
                           }}>
-                            {formatTime(comment.timestamp)}
+                            {comment.created_at ? 
+                              formatTime(new Date(comment.created_at).getTime()) :
+                              comment.timestamp ?
+                              formatTime(comment.timestamp) :
+                              'Just now'
+                            }
                           </span>
                         </div>
                         <p style={{
-                          ...styles.commentText,
-                          color: darkMode ? '#cbd5e1' : '#333'
-                        }}>{comment.text}</p>
+                          fontSize: '0.95rem',
+                          lineHeight: '1.6',
+                          whiteSpace: 'pre-wrap',
+                          color: darkMode ? '#cbd5e1' : '#333',
+                        }}>{comment.comment_text || comment.text || ''}</p>
                       </div>
                     ))}
                   </div>
                 ) : (
                   <p style={{
-                    ...styles.noDonations,
-                    color: darkMode ? '#64748b' : '#999'
+                    fontSize: '0.9375rem',
+                    color: darkMode ? '#64748b' : '#999',
+                    fontStyle: 'italic',
+                    textAlign: 'center',
+                    padding: '2rem',
                   }}>No comments yet. Be the first to comment!</p>
                 )}
               </div>
