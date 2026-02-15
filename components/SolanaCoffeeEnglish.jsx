@@ -122,8 +122,9 @@ const saveCampaigns = async (campaigns) => {
   }
 };
 
-// Admin Panel Component
-// Admin Panel Component
+// AdminPanel Component - Version Corrigée avec Design Original
+// Remplacer dans SolanaCoffeeEnglish.jsx
+
 function AdminPanel({ campaigns, onUpdateCampaigns, onClose, darkMode, publicKey, signMessage }) {
   const [editingCampaign, setEditingCampaign] = useState(null);
 
@@ -143,11 +144,9 @@ function AdminPanel({ campaigns, onUpdateCampaigns, onClose, darkMode, publicKey
     try {
       console.log('[ADMIN-DELETE] Requesting signature...');
 
-      // Create message to sign
       const timestamp = Date.now();
       const message = `Delete Campaign\nCampaign ID: ${campaignId}\nTimestamp: ${timestamp}\nWallet: ${publicKey.toString()}`;
       
-      // Request signature
       const messageBytes = new TextEncoder().encode(message);
       let signature;
       
@@ -162,7 +161,6 @@ function AdminPanel({ campaigns, onUpdateCampaigns, onClose, darkMode, publicKey
         return;
       }
 
-      // Call API to delete campaign and wallet with signature
       const response = await fetch('/api/delete-campaign', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
@@ -179,8 +177,7 @@ function AdminPanel({ campaigns, onUpdateCampaigns, onClose, darkMode, publicKey
         const data = await response.json();
         console.log(`[ADMIN-DELETE] ✅ Campaign ${campaignId} deleted by ${data.deletedBy}`);
         
-        // Reload campaigns from server to ensure sync
-        const freshCampaigns = await loadCampaigns();
+        const freshCampaigns = await fetch('/api/get-campaigns').then(r => r.json()).then(d => d.campaigns || []);
         onUpdateCampaigns(freshCampaigns);
         
         console.log(`[ADMIN-DELETE] Campaigns reloaded from server: ${freshCampaigns.length} total`);
@@ -211,8 +208,7 @@ function AdminPanel({ campaigns, onUpdateCampaigns, onClose, darkMode, publicKey
       if (response.ok) {
         console.log('[ADMIN-APPROVE] ✅ Campaign approved');
         
-        // Reload campaigns from server
-        const freshCampaigns = await loadCampaigns();
+        const freshCampaigns = await fetch('/api/get-campaigns').then(r => r.json()).then(d => d.campaigns || []);
         onUpdateCampaigns(freshCampaigns);
         
         alert('Campaign approved successfully!');
@@ -250,8 +246,7 @@ function AdminPanel({ campaigns, onUpdateCampaigns, onClose, darkMode, publicKey
       if (response.ok) {
         console.log('[ADMIN-EDIT] ✅ Campaign updated');
         
-        // Reload campaigns from server
-        const freshCampaigns = await loadCampaigns();
+        const freshCampaigns = await fetch('/api/get-campaigns').then(r => r.json()).then(d => d.campaigns || []);
         onUpdateCampaigns(freshCampaigns);
         setEditingCampaign(null);
         
@@ -270,167 +265,363 @@ function AdminPanel({ campaigns, onUpdateCampaigns, onClose, darkMode, publicKey
   const pendingCampaigns = campaigns.filter(c => !c.approved);
   const approvedCampaigns = campaigns.filter(c => c.approved);
 
-  // Reste du rendu JSX (inchangé)
   return (
-    <div style={styles.modalOverlay} onClick={onClose}>
+    <div style={{
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      background: 'rgba(0, 0, 0, 0.7)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 1000,
+      padding: '2rem',
+    }} onClick={onClose}>
       <div style={{
-        ...styles.modal,
-        maxWidth: '1000px',
         background: darkMode ? '#1e293b' : 'white',
-        color: darkMode ? '#f1f5f9' : '#1A1A1A'
+        color: darkMode ? '#f1f5f9' : '#1A1A1A',
+        borderRadius: '24px',
+        maxWidth: '900px',
+        width: '100%',
+        maxHeight: '90vh',
+        overflow: 'auto',
+        position: 'relative',
+        boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+        padding: '2rem',
       }} onClick={(e) => e.stopPropagation()}>
         <button onClick={onClose} style={{
-          ...styles.closeBtn,
+          position: 'absolute',
+          top: '1.5rem',
+          right: '1.5rem',
           background: darkMode ? '#334155' : '#F5F1ED',
-          color: darkMode ? '#cbd5e1' : '#666'
-        }}>✕</button>
+          border: 'none',
+          width: '40px',
+          height: '40px',
+          borderRadius: '50%',
+          fontSize: '1.5rem',
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          transition: 'all 0.3s',
+          color: darkMode ? '#cbd5e1' : '#666',
+          zIndex: 10,
+        }} className="close-btn">✕</button>
         
-        <div style={{
-          ...styles.modalHeader,
-          borderBottom: `1px solid ${darkMode ? '#334155' : '#F0EBE6'}`
-        }}>
-          <h2 style={{
-            ...styles.modalTitle,
-            color: darkMode ? '#f1f5f9' : '#1A1A1A'
-          }}>Admin Panel</h2>
-          <p style={{
-            ...styles.modalSubtitle,
-            color: darkMode ? '#cbd5e1' : '#666'
-          }}>Manage campaigns and approvals</p>
-        </div>
+        <h2 style={{
+          fontFamily: "'Google Sans', sans-serif",
+          fontSize: '2rem',
+          fontWeight: '700',
+          marginBottom: '2rem',
+          textAlign: 'center',
+          color: darkMode ? '#f1f5f9' : '#1A1A1A',
+        }}>Admin Panel</h2>
 
         {editingCampaign ? (
-          <div style={styles.adminContent}>
-            <h3 style={{
-              fontSize: '1.5rem',
+          <div style={{ padding: '2rem' }}>
+            <h3 style={{ 
+              color: darkMode ? '#f1f5f9' : '#1A1A1A',
               marginBottom: '1.5rem',
-              color: darkMode ? '#f1f5f9' : '#1A1A1A'
             }}>Edit Campaign</h3>
-            <div style={styles.formGroup}>
+            
+            <div style={{ marginBottom: '1.5rem' }}>
               <label style={{
-                ...styles.label,
-                color: darkMode ? '#f1f5f9' : '#1A1A1A'
+                display: 'block',
+                marginBottom: '0.5rem',
+                fontWeight: '600',
+                color: darkMode ? '#f1f5f9' : '#1A1A1A',
+                fontSize: '0.875rem',
+              }}>Name</label>
+              <input
+                type="text"
+                value={editingCampaign.name}
+                onChange={(e) => setEditingCampaign({...editingCampaign, name: e.target.value})}
+                style={{
+                  width: '100%',
+                  padding: '1rem',
+                  border: `2px solid ${darkMode ? '#4b5563' : '#E0E0E0'}`,
+                  borderRadius: '12px',
+                  fontSize: '1rem',
+                  transition: 'all 0.3s',
+                  fontFamily: 'inherit',
+                  background: darkMode ? '#334155' : 'white',
+                  color: darkMode ? '#f1f5f9' : '#1A1A1A',
+                }}
+              />
+            </div>
+            
+            <div style={{ marginBottom: '1.5rem' }}>
+              <label style={{
+                display: 'block',
+                marginBottom: '0.5rem',
+                fontWeight: '600',
+                color: darkMode ? '#f1f5f9' : '#1A1A1A',
+                fontSize: '0.875rem',
+              }}>Description</label>
+              <textarea
+                value={editingCampaign.description}
+                onChange={(e) => setEditingCampaign({...editingCampaign, description: e.target.value})}
+                rows="4"
+                style={{
+                  width: '100%',
+                  padding: '1rem',
+                  border: `2px solid ${darkMode ? '#4b5563' : '#E0E0E0'}`,
+                  borderRadius: '12px',
+                  fontSize: '1rem',
+                  minHeight: '100px',
+                  resize: 'vertical',
+                  fontFamily: 'inherit',
+                  transition: 'all 0.3s',
+                  background: darkMode ? '#334155' : 'white',
+                  color: darkMode ? '#f1f5f9' : '#1A1A1A',
+                }}
+              />
+            </div>
+            
+            <div style={{ marginBottom: '1.5rem' }}>
+              <label style={{
+                display: 'block',
+                marginBottom: '0.5rem',
+                fontWeight: '600',
+                color: darkMode ? '#f1f5f9' : '#1A1A1A',
+                fontSize: '0.875rem',
               }}>Goal Amount (SOL)</label>
               <input
                 type="number"
                 value={editingCampaign.goalAmount}
                 onChange={(e) => setEditingCampaign({...editingCampaign, goalAmount: parseFloat(e.target.value)})}
                 style={{
-                  ...styles.input,
+                  width: '100%',
+                  padding: '1rem',
+                  border: `2px solid ${darkMode ? '#4b5563' : '#E0E0E0'}`,
+                  borderRadius: '12px',
+                  fontSize: '1rem',
+                  transition: 'all 0.3s',
+                  fontFamily: 'inherit',
                   background: darkMode ? '#334155' : 'white',
                   color: darkMode ? '#f1f5f9' : '#1A1A1A',
-                  borderColor: darkMode ? '#4b5563' : '#E0E0E0'
                 }}
               />
             </div>
-            <div style={{display: 'flex', gap: '1rem', marginTop: '1.5rem'}}>
-              <button onClick={handleSaveEdit} style={styles.primaryBtn}>
-                Save Changes
-              </button>
+            
+            <div style={{ 
+              display: 'flex', 
+              gap: '0.75rem', 
+              flexWrap: 'wrap',
+            }}>
+              <button onClick={handleSaveEdit} style={{
+                padding: '0.75rem 1.5rem',
+                background: '#7c3aed',
+                color: 'white',
+                border: 'none',
+                borderRadius: '8px',
+                fontSize: '1rem',
+                fontWeight: '600',
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+              }}>Save Changes</button>
               <button onClick={() => setEditingCampaign(null)} style={{
-                ...styles.secondaryBtn,
-                background: darkMode ? '#334155' : '#F5F1ED',
-                color: darkMode ? '#cbd5e1' : '#666'
-              }}>
-                Cancel
-              </button>
+                padding: '0.75rem 1.5rem',
+                background: '#6B7280',
+                color: 'white',
+                border: 'none',
+                borderRadius: '8px',
+                fontSize: '1rem',
+                fontWeight: '600',
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+              }}>Cancel</button>
             </div>
           </div>
         ) : (
-          <div style={styles.adminContent}>
-            <div style={styles.adminSection}>
+          <>
+            <div style={{ marginBottom: '3rem' }}>
               <h3 style={{
                 fontSize: '1.25rem',
-                marginBottom: '1rem',
-                color: darkMode ? '#f1f5f9' : '#1A1A1A'
-              }}>
-                Pending Approval ({pendingCampaigns.length})
-              </h3>
+                fontWeight: '600',
+                marginBottom: '1.5rem',
+                color: darkMode ? '#cbd5e1' : '#374151',
+              }}>Pending Approval ({pendingCampaigns.length})</h3>
               {pendingCampaigns.length === 0 ? (
                 <p style={{
-                  color: darkMode ? '#94a3b8' : '#999',
+                  fontSize: '0.9375rem',
+                  color: darkMode ? '#64748b' : '#999',
+                  fontStyle: 'italic',
                   textAlign: 'center',
-                  padding: '2rem'
-                }}>
-                  No campaigns pending approval
-                </p>
+                  padding: '2rem',
+                }}>No pending campaigns</p>
               ) : (
-                pendingCampaigns.map(campaign => (
-                  <div key={campaign.id} style={{
-                    ...styles.adminCampaignCard,
-                    background: darkMode ? '#0f172a' : '#F9FAFB',
-                    borderColor: darkMode ? '#334155' : '#E5E7EB'
-                  }}>
-                    <div>
-                      <h4 style={{
-                        fontSize: '1.125rem',
-                        marginBottom: '0.5rem',
-                        color: darkMode ? '#f1f5f9' : '#1A1A1A'
-                      }}>{campaign.name}</h4>
+                <div style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '1rem',
+                }}>
+                  {pendingCampaigns.map(campaign => (
+                    <div key={campaign.id} style={{
+                      padding: '1.5rem',
+                      background: darkMode ? '#0f172a' : '#F9FAFB',
+                      borderRadius: '12px',
+                      border: `1px solid ${darkMode ? '#334155' : '#E5E7EB'}`,
+                    }}>
+                      <div style={{ marginBottom: '0.75rem' }}>
+                        <div>
+                          <strong style={{ color: darkMode ? '#f1f5f9' : '#1A1A1A' }}>{campaign.name}</strong>
+                          <span style={{
+                            fontSize: '0.875rem',
+                            color: darkMode ? '#94a3b8' : '#6B7280',
+                          }}> - {campaign.type}</span>
+                        </div>
+                      </div>
                       <p style={{
+                        fontSize: '0.9375rem',
+                        color: darkMode ? '#cbd5e1' : '#4B5563',
+                        marginBottom: '1rem',
+                        lineHeight: '1.6',
+                      }}>{campaign.description}</p>
+                      <div style={{
+                        display: 'flex',
+                        gap: '1.5rem',
                         fontSize: '0.875rem',
-                        color: darkMode ? '#94a3b8' : '#666'
+                        color: darkMode ? '#94a3b8' : '#6B7280',
+                        marginBottom: '1rem',
                       }}>
                         <span>Goal: {campaign.goalAmount} SOL</span>
-                        <span>Wallet: {campaign.walletAddress.slice(0, 8)}...</span>
-                      </p>
+                        <span>Wallet: {campaign.walletAddress?.slice(0, 8)}...</span>
+                      </div>
+                      <div style={{ 
+                        display: 'flex', 
+                        gap: '0.75rem', 
+                        flexWrap: 'wrap',
+                      }}>
+                        <button onClick={() => handleApprove(campaign.id)} style={{
+                          padding: '0.5rem 1rem',
+                          background: '#10B981',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '8px',
+                          fontSize: '0.875rem',
+                          fontWeight: '600',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s',
+                        }}>Approve</button>
+                        <button onClick={() => handleEdit(campaign)} style={{
+                          padding: '0.5rem 1rem',
+                          background: '#3B82F6',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '8px',
+                          fontSize: '0.875rem',
+                          fontWeight: '600',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s',
+                        }}>Edit</button>
+                        <button onClick={() => handleDelete(campaign.id)} style={{
+                          padding: '0.5rem 1rem',
+                          background: '#EF4444',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '8px',
+                          fontSize: '0.875rem',
+                          fontWeight: '600',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s',
+                        }}>Delete</button>
+                      </div>
                     </div>
-                    <div style={{display: 'flex', gap: '0.5rem'}}>
-                      <button onClick={() => handleApprove(campaign.id)} style={styles.approveBtn}>Approve</button>
-                      <button onClick={() => handleEdit(campaign)} style={{
-                        ...styles.editBtn,
-                        background: darkMode ? '#334155' : '#E5E7EB',
-                        color: darkMode ? '#cbd5e1' : '#1f2937'
-                      }}>Edit</button>
-                      <button onClick={() => handleDelete(campaign.id)} style={styles.deleteBtn}>Delete</button>
-                    </div>
-                  </div>
-                ))
+                  ))}
+                </div>
               )}
             </div>
 
-            <div style={{
-              ...styles.adminSection,
-              marginTop: '2rem'
-            }}>
+            <div style={{ marginBottom: '3rem' }}>
               <h3 style={{
                 fontSize: '1.25rem',
-                marginBottom: '1rem',
-                color: darkMode ? '#f1f5f9' : '#1A1A1A'
-              }}>
-                Approved Campaigns ({approvedCampaigns.length})
-              </h3>
-              {approvedCampaigns.map(campaign => (
-                <div key={campaign.id} style={{
-                  ...styles.adminCampaignCard,
-                  background: darkMode ? '#0f172a' : '#F9FAFB',
-                  borderColor: darkMode ? '#334155' : '#E5E7EB'
+                fontWeight: '600',
+                marginBottom: '1.5rem',
+                color: darkMode ? '#cbd5e1' : '#374151',
+              }}>Active Campaigns ({approvedCampaigns.length})</h3>
+              {approvedCampaigns.length === 0 ? (
+                <p style={{
+                  fontSize: '0.9375rem',
+                  color: darkMode ? '#64748b' : '#999',
+                  fontStyle: 'italic',
+                  textAlign: 'center',
+                  padding: '2rem',
+                }}>No active campaigns</p>
+              ) : (
+                <div style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '1rem',
                 }}>
-                  <div>
-                    <h4 style={{
-                      fontSize: '1.125rem',
-                      marginBottom: '0.5rem',
-                      color: darkMode ? '#f1f5f9' : '#1A1A1A'
-                    }}>{campaign.name}</h4>
-                    <p style={{
-                      fontSize: '0.875rem',
-                      color: darkMode ? '#94a3b8' : '#666'
+                  {approvedCampaigns.map(campaign => (
+                    <div key={campaign.id} style={{
+                      padding: '1.5rem',
+                      background: darkMode ? '#0f172a' : '#F9FAFB',
+                      borderRadius: '12px',
+                      border: `1px solid ${darkMode ? '#334155' : '#E5E7EB'}`,
                     }}>
-                      <span>Raised: {campaign.currentAmount} / {campaign.goalAmount} SOL</span>
-                    </p>
-                  </div>
-                  <div style={{display: 'flex', gap: '0.5rem'}}>
-                    <button onClick={() => handleEdit(campaign)} style={{
-                      ...styles.editBtn,
-                      background: darkMode ? '#334155' : '#E5E7EB',
-                      color: darkMode ? '#cbd5e1' : '#1f2937'
-                    }}>Edit</button>
-                    <button onClick={() => handleDelete(campaign.id)} style={styles.deleteBtn}>Delete</button>
-                  </div>
+                      <div style={{ marginBottom: '0.75rem' }}>
+                        <div>
+                          <strong style={{ color: darkMode ? '#f1f5f9' : '#1A1A1A' }}>{campaign.name}</strong>
+                          <span style={{
+                            fontSize: '0.875rem',
+                            color: darkMode ? '#94a3b8' : '#6B7280',
+                          }}> - {campaign.type}</span>
+                        </div>
+                      </div>
+                      <p style={{
+                        fontSize: '0.9375rem',
+                        color: darkMode ? '#cbd5e1' : '#4B5563',
+                        marginBottom: '1rem',
+                        lineHeight: '1.6',
+                      }}>{campaign.description}</p>
+                      <div style={{
+                        display: 'flex',
+                        gap: '1.5rem',
+                        fontSize: '0.875rem',
+                        color: darkMode ? '#94a3b8' : '#6B7280',
+                        marginBottom: '1rem',
+                      }}>
+                        <span>Raised: {campaign.currentAmount} / {campaign.goalAmount} SOL</span>
+                        <span>{campaign.supporters} supporters</span>
+                      </div>
+                      <div style={{ 
+                        display: 'flex', 
+                        gap: '0.75rem', 
+                        flexWrap: 'wrap',
+                      }}>
+                        <button onClick={() => handleEdit(campaign)} style={{
+                          padding: '0.5rem 1rem',
+                          background: '#3B82F6',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '8px',
+                          fontSize: '0.875rem',
+                          fontWeight: '600',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s',
+                        }}>Edit</button>
+                        <button onClick={() => handleDelete(campaign.id)} style={{
+                          padding: '0.5rem 1rem',
+                          background: '#EF4444',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '8px',
+                          fontSize: '0.875rem',
+                          fontWeight: '600',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s',
+                        }}>Delete</button>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              ))}
+              )}
             </div>
-          </div>
+          </>
         )}
       </div>
     </div>
@@ -1095,7 +1286,9 @@ function CampaignDetail({ campaign, onBack, onDonate, onRedeem, onDelete, darkMo
   );
 }
 
-// Create Campaign Component
+// CreateCampaign Component - Version Corrigée avec Design Original
+// Remplacer dans SolanaCoffeeEnglish.jsx
+
 function CreateCampaign({ onClose, onCreate, darkMode }) {
   const { publicKey } = useWallet();
   const [formData, setFormData] = useState({
@@ -1153,23 +1346,22 @@ function CreateCampaign({ onClose, onCreate, darkMode }) {
       const newCampaign = {
         id: campaignId,
         ...formData,
-        avatar: formData.type === 'person' ? <i className="bi bi-person-badge"></i> : <i className="bi bi-balloon-heart"></i>,
-        walletAddress: walletData.campaignWallet, // Generated wallet instead of user wallet
-        creatorWallet: publicKey.toString(), // Store creator wallet separately
+        avatar: formData.type === 'person' ? 'person-badge' : 'balloon-heart',
+        walletAddress: walletData.campaignWallet,
+        creatorWallet: publicKey.toString(),
         currentAmount: 0,
         goalAmount: parseFloat(formData.goalAmount),
         supporters: 0,
         timeRemaining: '30 days',
         urgent: false,
         recentDonations: [],
-        approved: false, // Needs admin approval
+        approved: false,
         fundsRedeemed: false,
         createdAt: Date.now(),
       };
       
       console.log('[CAMPAIGN-CREATE] Step 2: Saving campaign to database...');
 
-      // Save campaign to API
       const response = await fetch('/api/create-campaign', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1193,37 +1385,75 @@ function CreateCampaign({ onClose, onCreate, darkMode }) {
   };
 
   return (
-    <div style={styles.modalOverlay} onClick={onClose}>
+    <div style={{
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      background: 'rgba(0, 0, 0, 0.7)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 1000,
+      padding: '2rem',
+    }} onClick={onClose}>
       <div style={{
-        ...styles.modal,
         background: darkMode ? '#1e293b' : 'white',
-        color: darkMode ? '#f1f5f9' : '#1A1A1A'
+        color: darkMode ? '#f1f5f9' : '#1A1A1A',
+        borderRadius: '24px',
+        maxWidth: '500px',
+        width: '100%',
+        maxHeight: '90vh',
+        overflow: 'auto',
+        position: 'relative',
+        boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
       }} onClick={(e) => e.stopPropagation()} className="modal">
         <button onClick={onClose} style={{
-          ...styles.closeBtn,
+          position: 'absolute',
+          top: '1.5rem',
+          right: '1.5rem',
           background: darkMode ? '#334155' : '#F5F1ED',
-          color: darkMode ? '#cbd5e1' : '#666'
+          border: 'none',
+          width: '40px',
+          height: '40px',
+          borderRadius: '50%',
+          fontSize: '1.5rem',
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          transition: 'all 0.3s',
+          color: darkMode ? '#cbd5e1' : '#666',
+          zIndex: 10,
         }} className="close-btn">✕</button>
         
         <div style={{
-          ...styles.modalHeader,
-          borderBottom: `1px solid ${darkMode ? '#334155' : '#F0EBE6'}`
+          padding: '3rem 2rem 1.5rem',
+          textAlign: 'center',
+          borderBottom: `1px solid ${darkMode ? '#334155' : '#F0EBE6'}`,
         }}>
           <h2 style={{
-            ...styles.modalTitle,
-            color: darkMode ? '#f1f5f9' : '#1A1A1A'
+            fontFamily: "'Google Sans', sans-serif",
+            fontSize: '1.75rem',
+            fontWeight: '700',
+            color: darkMode ? '#f1f5f9' : '#1A1A1A',
+            marginBottom: '0.5rem',
           }}>Create a Campaign</h2>
           <p style={{
-            ...styles.modalSubtitle,
-            color: darkMode ? '#cbd5e1' : '#666'
+            fontSize: '0.9375rem',
+            color: darkMode ? '#cbd5e1' : '#666',
           }}>Share your project with the community</p>
         </div>
         
-        <form onSubmit={handleSubmit} style={styles.form}>
-          <div style={styles.formGroup}>
+        <form onSubmit={handleSubmit} style={{ padding: '2rem' }}>
+          <div style={{ marginBottom: '1.5rem' }}>
             <label style={{
-              ...styles.label,
-              color: darkMode ? '#f1f5f9' : '#1A1A1A'
+              display: 'block',
+              marginBottom: '0.5rem',
+              fontWeight: '600',
+              color: darkMode ? '#f1f5f9' : '#1A1A1A',
+              fontSize: '0.875rem',
             }}>Name *</label>
             <input
               type="text"
@@ -1232,38 +1462,54 @@ function CreateCampaign({ onClose, onCreate, darkMode }) {
               placeholder="Your name or organization"
               required
               style={{
-                ...styles.input,
+                width: '100%',
+                padding: '1rem',
+                border: `2px solid ${darkMode ? '#4b5563' : '#E0E0E0'}`,
+                borderRadius: '12px',
+                fontSize: '1rem',
+                transition: 'all 0.3s',
+                fontFamily: 'inherit',
                 background: darkMode ? '#334155' : 'white',
                 color: darkMode ? '#f1f5f9' : '#1A1A1A',
-                borderColor: darkMode ? '#4b5563' : '#E0E0E0'
               }}
             />
           </div>
 
-          <div style={styles.formGroup}>
+          <div style={{ marginBottom: '1.5rem' }}>
             <label style={{
-              ...styles.label,
-              color: darkMode ? '#f1f5f9' : '#1A1A1A'
+              display: 'block',
+              marginBottom: '0.5rem',
+              fontWeight: '600',
+              color: darkMode ? '#f1f5f9' : '#1A1A1A',
+              fontSize: '0.875rem',
             }}>Type *</label>
             <select
               value={formData.type}
               onChange={(e) => setFormData({...formData, type: e.target.value})}
               style={{
-                ...styles.input,
+                width: '100%',
+                padding: '1rem',
+                border: `2px solid ${darkMode ? '#4b5563' : '#E0E0E0'}`,
+                borderRadius: '12px',
+                fontSize: '1rem',
+                transition: 'all 0.3s',
+                fontFamily: 'inherit',
                 background: darkMode ? '#334155' : 'white',
                 color: darkMode ? '#f1f5f9' : '#1A1A1A',
-                borderColor: darkMode ? '#4b5563' : '#E0E0E0'
               }}
             >
-              <option value="person"><i className="bi bi-person-badge"></i> Person</option>
-              <option value="charity"><i className="bi bi-balloon-heart"></i> Charity</option>
+              <option value="person">Person</option>
+              <option value="charity">Charity</option>
             </select>
           </div>
 
-          <div style={styles.formGroup}>
+          <div style={{ marginBottom: '1.5rem' }}>
             <label style={{
-              ...styles.label,
-              color: darkMode ? '#f1f5f9' : '#1A1A1A'
+              display: 'block',
+              marginBottom: '0.5rem',
+              fontWeight: '600',
+              color: darkMode ? '#f1f5f9' : '#1A1A1A',
+              fontSize: '0.875rem',
             }}>Photo URL *</label>
             <input
               type="url"
@@ -1272,22 +1518,32 @@ function CreateCampaign({ onClose, onCreate, darkMode }) {
               placeholder="https://example.com/image.jpg"
               required
               style={{
-                ...styles.input,
+                width: '100%',
+                padding: '1rem',
+                border: `2px solid ${darkMode ? '#4b5563' : '#E0E0E0'}`,
+                borderRadius: '12px',
+                fontSize: '1rem',
+                transition: 'all 0.3s',
+                fontFamily: 'inherit',
                 background: darkMode ? '#334155' : 'white',
                 color: darkMode ? '#f1f5f9' : '#1A1A1A',
-                borderColor: darkMode ? '#4b5563' : '#E0E0E0'
               }}
             />
             <span style={{
-              ...styles.hint,
-              color: darkMode ? '#94a3b8' : '#999'
+              fontSize: '0.75rem',
+              color: darkMode ? '#94a3b8' : '#999',
+              marginTop: '0.5rem',
+              display: 'block',
             }}>Link to your profile photo</span>
           </div>
 
-          <div style={styles.formGroup}>
+          <div style={{ marginBottom: '1.5rem' }}>
             <label style={{
-              ...styles.label,
-              color: darkMode ? '#f1f5f9' : '#1A1A1A'
+              display: 'block',
+              marginBottom: '0.5rem',
+              fontWeight: '600',
+              color: darkMode ? '#f1f5f9' : '#1A1A1A',
+              fontSize: '0.875rem',
             }}>Description *</label>
             <textarea
               value={formData.description}
@@ -1296,18 +1552,28 @@ function CreateCampaign({ onClose, onCreate, darkMode }) {
               required
               rows="4"
               style={{
-                ...styles.textarea,
+                width: '100%',
+                padding: '1rem',
+                border: `2px solid ${darkMode ? '#4b5563' : '#E0E0E0'}`,
+                borderRadius: '12px',
+                fontSize: '1rem',
+                minHeight: '100px',
+                resize: 'vertical',
+                fontFamily: 'inherit',
+                transition: 'all 0.3s',
                 background: darkMode ? '#334155' : 'white',
                 color: darkMode ? '#f1f5f9' : '#1A1A1A',
-                borderColor: darkMode ? '#4b5563' : '#E0E0E0'
               }}
             />
           </div>
 
-          <div style={styles.formGroup}>
+          <div style={{ marginBottom: '1.5rem' }}>
             <label style={{
-              ...styles.label,
-              color: darkMode ? '#f1f5f9' : '#1A1A1A'
+              display: 'block',
+              marginBottom: '0.5rem',
+              fontWeight: '600',
+              color: darkMode ? '#f1f5f9' : '#1A1A1A',
+              fontSize: '0.875rem',
             }}>Goal (SOL) *</label>
             <input
               type="number"
@@ -1318,31 +1584,42 @@ function CreateCampaign({ onClose, onCreate, darkMode }) {
               placeholder="100"
               required
               style={{
-                ...styles.input,
+                width: '100%',
+                padding: '1rem',
+                border: `2px solid ${darkMode ? '#4b5563' : '#E0E0E0'}`,
+                borderRadius: '12px',
+                fontSize: '1rem',
+                transition: 'all 0.3s',
+                fontFamily: 'inherit',
                 background: darkMode ? '#334155' : 'white',
                 color: darkMode ? '#f1f5f9' : '#1A1A1A',
-                borderColor: darkMode ? '#4b5563' : '#E0E0E0'
               }}
             />
           </div>
 
-          <div style={styles.formGroup}>
+          <div style={{ marginBottom: '1.5rem' }}>
             <label style={{
-              ...styles.label,
-              color: darkMode ? '#f1f5f9' : '#1A1A1A'
+              display: 'block',
+              marginBottom: '0.5rem',
+              fontWeight: '600',
+              color: darkMode ? '#f1f5f9' : '#1A1A1A',
+              fontSize: '0.875rem',
             }}>Social Links (optional)</label>
             <span style={{
-              ...styles.hint,
+              fontSize: '0.75rem',
               color: darkMode ? '#94a3b8' : '#999',
               marginBottom: '0.5rem',
-              display: 'block'
+              display: 'block',
             }}>Add your social media links</span>
           </div>
 
-          <div style={styles.formGroup}>
+          <div style={{ marginBottom: '1.5rem' }}>
             <label style={{
-              ...styles.label,
-              color: darkMode ? '#f1f5f9' : '#1A1A1A'
+              display: 'block',
+              marginBottom: '0.5rem',
+              fontWeight: '600',
+              color: darkMode ? '#f1f5f9' : '#1A1A1A',
+              fontSize: '0.875rem',
             }}><i className="bi bi-twitter-x"></i> Twitter / X</label>
             <input
               type="url"
@@ -1350,18 +1627,26 @@ function CreateCampaign({ onClose, onCreate, darkMode }) {
               onChange={(e) => setFormData({...formData, twitter: e.target.value})}
               placeholder="https://twitter.com/username"
               style={{
-                ...styles.input,
+                width: '100%',
+                padding: '1rem',
+                border: `2px solid ${darkMode ? '#4b5563' : '#E0E0E0'}`,
+                borderRadius: '12px',
+                fontSize: '1rem',
+                transition: 'all 0.3s',
+                fontFamily: 'inherit',
                 background: darkMode ? '#334155' : 'white',
                 color: darkMode ? '#f1f5f9' : '#1A1A1A',
-                borderColor: darkMode ? '#4b5563' : '#E0E0E0'
               }}
             />
           </div>
 
-          <div style={styles.formGroup}>
+          <div style={{ marginBottom: '1.5rem' }}>
             <label style={{
-              ...styles.label,
-              color: darkMode ? '#f1f5f9' : '#1A1A1A'
+              display: 'block',
+              marginBottom: '0.5rem',
+              fontWeight: '600',
+              color: darkMode ? '#f1f5f9' : '#1A1A1A',
+              fontSize: '0.875rem',
             }}><i className="bi bi-telegram"></i> Telegram</label>
             <input
               type="url"
@@ -1369,18 +1654,26 @@ function CreateCampaign({ onClose, onCreate, darkMode }) {
               onChange={(e) => setFormData({...formData, telegram: e.target.value})}
               placeholder="https://t.me/username"
               style={{
-                ...styles.input,
+                width: '100%',
+                padding: '1rem',
+                border: `2px solid ${darkMode ? '#4b5563' : '#E0E0E0'}`,
+                borderRadius: '12px',
+                fontSize: '1rem',
+                transition: 'all 0.3s',
+                fontFamily: 'inherit',
                 background: darkMode ? '#334155' : 'white',
                 color: darkMode ? '#f1f5f9' : '#1A1A1A',
-                borderColor: darkMode ? '#4b5563' : '#E0E0E0'
               }}
             />
           </div>
 
-          <div style={styles.formGroup}>
+          <div style={{ marginBottom: '1.5rem' }}>
             <label style={{
-              ...styles.label,
-              color: darkMode ? '#f1f5f9' : '#1A1A1A'
+              display: 'block',
+              marginBottom: '0.5rem',
+              fontWeight: '600',
+              color: darkMode ? '#f1f5f9' : '#1A1A1A',
+              fontSize: '0.875rem',
             }}><i className="bi bi-globe"></i> Website</label>
             <input
               type="url"
@@ -1388,31 +1681,56 @@ function CreateCampaign({ onClose, onCreate, darkMode }) {
               onChange={(e) => setFormData({...formData, website: e.target.value})}
               placeholder="https://example.com"
               style={{
-                ...styles.input,
+                width: '100%',
+                padding: '1rem',
+                border: `2px solid ${darkMode ? '#4b5563' : '#E0E0E0'}`,
+                borderRadius: '12px',
+                fontSize: '1rem',
+                transition: 'all 0.3s',
+                fontFamily: 'inherit',
                 background: darkMode ? '#334155' : 'white',
                 color: darkMode ? '#f1f5f9' : '#1A1A1A',
-                borderColor: darkMode ? '#4b5563' : '#E0E0E0'
               }}
             />
           </div>
 
           {!publicKey && (
             <div style={{
-              ...styles.walletWarning,
+              padding: '1rem',
               background: darkMode ? '#334155' : '#FEF3C7',
-              color: darkMode ? '#fbbf24' : '#92400E'
+              borderRadius: '10px',
+              marginBottom: '1rem',
+              textAlign: 'center',
+              fontWeight: '600',
+              color: darkMode ? '#fbbf24' : '#92400E',
+              fontSize: '0.875rem',
             }}>
               Connect your wallet to create a campaign
             </div>
           )}
 
-          <button type="submit" disabled={!publicKey} style={styles.submitBtn} className="submit-btn">
+          <button type="submit" disabled={!publicKey} style={{
+            width: '100%',
+            padding: '1rem',
+            background: '#7c3aed',
+            color: 'white',
+            border: 'none',
+            borderRadius: '12px',
+            fontSize: '1rem',
+            fontWeight: '600',
+            cursor: publicKey ? 'pointer' : 'not-allowed',
+            transition: 'all 0.3s',
+            opacity: publicKey ? 1 : 0.5,
+          }} className="submit-btn">
             Submit Campaign
           </button>
           
           <p style={{
-            ...styles.hint,
-            color: darkMode ? '#94a3b8' : '#999'
+            fontSize: '0.75rem',
+            color: darkMode ? '#94a3b8' : '#999',
+            marginTop: '0.5rem',
+            display: 'block',
+            textAlign: 'center',
           }}>Your campaign will be reviewed by an admin before going live.</p>
         </form>
       </div>
