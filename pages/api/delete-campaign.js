@@ -1,19 +1,16 @@
 // pages/api/delete-campaign.js
-import fs from 'fs';
-import path from 'path';
-import config from '../../config.js';
-import { verifyDeleteSignature } from '../../middleware/verifySignature.js';
+// Delete campaign from PostgreSQL with signature verification
 
-const CAMPAIGNS_FILE = path.join(process.cwd(), config.paths.campaignsFile);
-const WALLETS_FILE = path.join(process.cwd(), config.paths.walletsFile);
+import { query } from '../../lib/db.js';
+import { verifyDeleteSignature } from '../../middleware/verifySignature.js';
+import config from '../../config.js';
 
 export default async function handler(req, res) {
   if (req.method === 'DELETE') {
-    // First, verify the wallet signature
     return verifyDeleteSignature(req, res, async () => {
       try {
         const { campaignId } = req.body;
-        const requestingWallet = req.verifiedWallet; // From signature verification
+        const requestingWallet = req.verifiedWallet;
         
         console.log('[DELETE] Delete request from verified wallet:', requestingWallet);
         
@@ -21,36 +18,71 @@ export default async function handler(req, res) {
           return res.status(400).json({ error: 'Missing campaignId' });
         }
         
-        // Convert to string for consistency
         const campaignIdStr = campaignId.toString();
         
-        // Load campaigns to check ownership
-        if (!fs.existsSync(CAMPAIGNS_FILE)) {
-          return res.status(404).json({ error: 'Campaigns file not found' });
+        // Get campaign to check ownership
+        const campaignResult = await query(
+          'SELECT * FROM campaigns WHERE campaign_id = $1',
+          [campaignIdStr]
+        );
+        
+        // Also check campaign_wallets if not in campaigns table
+        if (campaignResult.rows.length === 0) {
+          const walletResult = await query(
+            'SELECT * FROM campaign_wallets WHERE campaign_id = $1',
+            [campaignIdStr]
+          );
+          
+          if (walletResult.rows.length === 0) {
+            console.log('[DELETE] ❌ Campaign not found:', campaignIdStr);
+            return res.status(404).json({ error: 'Campaign not found' });
+          }
+          
+          // Use wallet info for authorization
+          const wallet = walletResult.rows[0];
+          const isCreator = wallet.creator_wallet === requestingWallet;
+          const isAdmin = requestingWallet === config.wallet.adminWallet;
+          
+          if (!isCreator && !isAdmin) {
+            console.log('[DELETE] ❌ Unauthorized');
+            return res.status(403).json({ 
+              error: 'Unauthorized: Only campaign creator or admin can delete this campaign'
+            });
+          }
+          
+          console.log(`[DELETE] ✅ Authorized as ${isAdmin ? 'ADMIN' : 'CREATOR'}`);
+          
+          // Delete from campaign_wallets
+          await query(
+            'DELETE FROM campaign_wallets WHERE campaign_id = $1',
+            [campaignIdStr]
+          );
+          
+          console.log('[DELETE] ✅ Campaign wallet deleted');
+          
+          return res.status(200).json({ 
+            success: true,
+            message: 'Campaign deleted successfully',
+            deletedBy: isAdmin ? 'admin' : 'creator'
+          });
         }
         
-        const campaignsData = JSON.parse(fs.readFileSync(CAMPAIGNS_FILE, 'utf8'));
-        const campaign = campaignsData.campaigns.find(c => c.id.toString() === campaignIdStr);
+        // Campaign found in campaigns table
+        const campaign = campaignResult.rows[0];
         
-        if (!campaign) {
-          console.log('[DELETE] ❌ Campaign not found:', campaignIdStr);
-          return res.status(404).json({ error: 'Campaign not found' });
-        }
-        
-        // Check if verified wallet is creator OR admin
-        const isCreator = campaign.creatorWallet === requestingWallet;
+        const isCreator = campaign.creator_wallet === requestingWallet;
         const isAdmin = requestingWallet === config.wallet.adminWallet;
         
         console.log('[DELETE] Authorization check:', {
           verifiedWallet: requestingWallet,
-          campaignCreator: campaign.creatorWallet,
+          campaignCreator: campaign.creator_wallet,
           adminWallet: config.wallet.adminWallet,
           isCreator,
           isAdmin
         });
         
         if (!isCreator && !isAdmin) {
-          console.log('[DELETE] ❌ Unauthorized: Wallet verified but not creator or admin');
+          console.log('[DELETE] ❌ Unauthorized');
           return res.status(403).json({ 
             error: 'Unauthorized: Only campaign creator or admin can delete this campaign'
           });
@@ -58,33 +90,21 @@ export default async function handler(req, res) {
         
         console.log(`[DELETE] ✅ Authorized as ${isAdmin ? 'ADMIN' : 'CREATOR'}`);
         
-        // Delete from campaigns.json
-        const originalLength = campaignsData.campaigns.length;
-        campaignsData.campaigns = campaignsData.campaigns.filter(
-          c => c.id.toString() !== campaignIdStr
+        // Delete from campaigns (cascade will delete comments and donations)
+        await query(
+          'DELETE FROM campaigns WHERE campaign_id = $1',
+          [campaignIdStr]
         );
         
-        const deleted = originalLength - campaignsData.campaigns.length;
+        console.log('[DELETE] ✅ Campaign deleted from campaigns table');
         
-        if (deleted > 0) {
-          fs.writeFileSync(CAMPAIGNS_FILE, JSON.stringify(campaignsData, null, 2));
-          console.log('[DELETE] ✅ Campaign deleted from campaigns.json');
-        }
+        // Delete from campaign_wallets
+        await query(
+          'DELETE FROM campaign_wallets WHERE campaign_id = $1',
+          [campaignIdStr]
+        );
         
-        // Delete from campaign-wallets.json
-        if (fs.existsSync(WALLETS_FILE)) {
-          const walletsData = JSON.parse(fs.readFileSync(WALLETS_FILE, 'utf8'));
-          
-          if (walletsData.wallets && walletsData.wallets[campaignIdStr]) {
-            const walletAddress = walletsData.wallets[campaignIdStr].publicKey;
-            delete walletsData.wallets[campaignIdStr];
-            
-            fs.writeFileSync(WALLETS_FILE, JSON.stringify(walletsData, null, 2));
-            console.log('[DELETE] ✅ Wallet deleted from campaign-wallets.json');
-          }
-        }
-        
-        console.log('[DELETE] ✅ Campaign and wallet deleted successfully by', isAdmin ? 'ADMIN' : 'CREATOR');
+        console.log('[DELETE] ✅ Campaign wallet deleted');
         
         res.status(200).json({ 
           success: true,

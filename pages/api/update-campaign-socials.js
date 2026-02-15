@@ -1,82 +1,68 @@
 // pages/api/update-campaign-socials.js
-import fs from 'fs';
-import path from 'path';
-import { verifyUpdateSocialsSignature } from '../../middleware/verifySignature.js';
+// Update campaign social links in PostgreSQL
 
-const DATA_DIR = path.join(process.cwd(), 'data');
-const CAMPAIGNS_FILE = path.join(DATA_DIR, 'campaigns.json');
+import { query } from '../../lib/db.js';
+import { verifyUpdateSocialsSignature } from '../../middleware/verifySignature.js';
 
 export default async function handler(req, res) {
   if (req.method === 'POST') {
-    // First, verify the wallet signature
     return verifyUpdateSocialsSignature(req, res, async () => {
       try {
-        const { campaignId, socials } = req.body;
-        const creatorWallet = req.verifiedWallet; // From signature verification
+        const { campaignId, twitter, telegram, website } = req.body;
+        const creatorWallet = req.verifiedWallet;
         
         console.log('[UPDATE-SOCIALS] Request from verified wallet:', creatorWallet);
         
-        // Validation
         if (!campaignId) {
           return res.status(400).json({ error: 'Missing campaignId' });
         }
         
-        // Load campaigns
-        if (!fs.existsSync(CAMPAIGNS_FILE)) {
-          return res.status(404).json({ error: 'Campaigns file not found' });
-        }
+        // Get campaign to verify ownership
+        const result = await query(
+          'SELECT * FROM campaigns WHERE campaign_id = $1',
+          [campaignId.toString()]
+        );
         
-        const campaignsData = JSON.parse(fs.readFileSync(CAMPAIGNS_FILE, 'utf8'));
-        const campaignIndex = campaignsData.campaigns.findIndex(c => c.id === parseInt(campaignId));
-        
-        if (campaignIndex === -1) {
+        if (result.rows.length === 0) {
           return res.status(404).json({ error: 'Campaign not found' });
         }
         
-        const campaign = campaignsData.campaigns[campaignIndex];
+        const campaign = result.rows[0];
         
-        // VÉRIFICATION : Seul le créateur peut modifier les socials (déjà vérifié par signature)
-        if (campaign.creatorWallet !== creatorWallet) {
-          console.error(`[UPDATE-SOCIALS] ❌ Wallet verified but not creator: ${creatorWallet} vs ${campaign.creatorWallet}`);
-          return res.status(403).json({ error: 'Unauthorized: You are not the creator of this campaign' });
+        // Verify creator
+        if (campaign.creator_wallet !== creatorWallet) {
+          return res.status(403).json({ 
+            error: 'Unauthorized: Only campaign creator can update social links' 
+          });
         }
         
-        console.log('[UPDATE-SOCIALS] ✅ Creator verified');
+        console.log('[UPDATE-SOCIALS] ✅ Authorized as creator');
         
-        // Update socials - NEVER overwrite existing values
-        const updatedCampaign = {
-          ...campaign,
-        socialsUpdatedAt: Date.now()
-      };
-      
-      // Only add/update if the field is empty in the campaign
-      if (!campaign.twitter && socials.twitter) {
-        updatedCampaign.twitter = socials.twitter;
+        // Update social links
+        await query(
+          `UPDATE campaigns 
+           SET twitter = $1, 
+               telegram = $2, 
+               website = $3,
+               updated_at = NOW()
+           WHERE campaign_id = $4`,
+          [twitter || null, telegram || null, website || null, campaignId.toString()]
+        );
+        
+        console.log('[UPDATE-SOCIALS] ✅ Social links updated');
+        
+        res.status(200).json({ 
+          success: true,
+          message: 'Social links updated successfully'
+        });
+        
+      } catch (error) {
+        console.error('[UPDATE-SOCIALS] Error:', error);
+        res.status(500).json({ 
+          error: error.message || 'Failed to update social links' 
+        });
       }
-      if (!campaign.telegram && socials.telegram) {
-        updatedCampaign.telegram = socials.telegram;
-      }
-      if (!campaign.website && socials.website) {
-        updatedCampaign.website = socials.website;
-      }
-      
-      campaignsData.campaigns[campaignIndex] = updatedCampaign;
-      
-      // Save to file
-      fs.writeFileSync(CAMPAIGNS_FILE, JSON.stringify(campaignsData, null, 2));
-      
-      console.log('[UPDATE-SOCIALS] ✅ Socials updated successfully');
-      
-      res.status(200).json({ 
-        success: true,
-        message: 'Social links updated successfully'
-      });
-      
-    } catch (error) {
-      console.error('[UPDATE-SOCIALS] ❌ Error:', error);
-      res.status(500).json({ error: 'Internal server error' });
-    }
-    }); // Close verifyUpdateSocialsSignature middleware
+    });
   } else {
     res.status(405).json({ error: 'Method not allowed' });
   }

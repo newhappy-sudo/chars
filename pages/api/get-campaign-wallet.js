@@ -1,10 +1,10 @@
 // pages/api/get-campaign-wallet.js
-import { Connection, PublicKey, LAMPORTS_PER_SOL } from '@solana/web3.js';
-import fs from 'fs';
-import path from 'path';
+// Get campaign wallet info from PostgreSQL
 
-const WALLETS_FILE = path.join(process.cwd(), 'data', 'campaign-wallets.json');
-const SOLANA_RPC = "https://api.mainnet.solana.com";
+import { query } from '../../lib/db.js';
+import { Connection, PublicKey, LAMPORTS_PER_SOL } from '@solana/web3.js';
+
+const SOLANA_RPC = process.env.SOLANA_RPC_URL || 'https://api.mainnet-beta.solana.com';
 
 export default async function handler(req, res) {
   if (req.method === 'GET') {
@@ -12,40 +12,43 @@ export default async function handler(req, res) {
       const { campaignId } = req.query;
       
       if (!campaignId) {
-        return res.status(400).json({ error: 'Campaign ID required' });
+        return res.status(400).json({ error: 'Missing campaignId' });
       }
       
-      // Check if wallets file exists
-      if (!fs.existsSync(WALLETS_FILE)) {
-        return res.status(404).json({ error: 'No campaign wallets found' });
-      }
+      // Get from database
+      const result = await query(
+        'SELECT * FROM campaign_wallets WHERE campaign_id = $1',
+        [campaignId]
+      );
       
-      // Load wallet data
-      const walletsData = JSON.parse(fs.readFileSync(WALLETS_FILE, 'utf8'));
-      const walletInfo = walletsData.wallets[campaignId];
-      
-      if (!walletInfo) {
+      if (result.rows.length === 0) {
         return res.status(404).json({ error: 'Campaign wallet not found' });
       }
       
+      const wallet = result.rows[0];
+      
       // Get current balance from blockchain
       const connection = new Connection(SOLANA_RPC, 'confirmed');
-      const balance = await connection.getBalance(new PublicKey(walletInfo.campaignWallet));
+      const publicKey = new PublicKey(wallet.campaign_wallet);
+      const currentBalance = await connection.getBalance(publicKey);
       
       res.status(200).json({
-        campaignWallet: walletInfo.campaignWallet,
-        creatorWallet: walletInfo.creatorWallet,
-        currentBalance: balance / LAMPORTS_PER_SOL,
-        totalRedeemed: walletInfo.totalRedeemed / LAMPORTS_PER_SOL,
-        feesCollected: walletInfo.feesCollected / LAMPORTS_PER_SOL,
-        redeemed: walletInfo.redeemed,
-        redeemedAt: walletInfo.redeemedAt,
-        createdAt: walletInfo.createdAt
+        campaignWallet: wallet.campaign_wallet,
+        creatorWallet: wallet.creator_wallet,
+        currentBalance: currentBalance,
+        currentBalanceSOL: currentBalance / LAMPORTS_PER_SOL,
+        totalReceived: wallet.total_received,
+        totalReceivedSOL: (wallet.total_received || 0) / LAMPORTS_PER_SOL,
+        feesCollected: wallet.fees_collected,
+        feesCollectedSOL: (wallet.fees_collected || 0) / LAMPORTS_PER_SOL,
+        redeemed: wallet.redeemed,
+        redeemedAt: wallet.redeemed_at,
+        createdAt: wallet.created_at
       });
       
     } catch (error) {
-      console.error('Error getting campaign wallet:', error);
-      res.status(500).json({ error: 'Failed to get campaign wallet info' });
+      console.error('[GET-WALLET] Error:', error);
+      res.status(500).json({ error: error.message || 'Failed to get wallet' });
     }
   } else {
     res.status(405).json({ error: 'Method not allowed' });

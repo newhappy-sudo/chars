@@ -1,85 +1,79 @@
 // pages/api/save-donation.js
-import fs from 'fs';
-import path from 'path';
+// Save donation to PostgreSQL
 
-const DONATIONS_FILE = path.join(process.cwd(), 'data', 'donations.json');
-const CAMPAIGNS_FILE = path.join(process.cwd(), 'data', 'campaigns.json');
+import { query } from '../../lib/db.js';
+import { Connection, PublicKey } from '@solana/web3.js';
 
-function ensureDataFiles() {
-  const dataDir = path.join(process.cwd(), 'data');
-  if (!fs.existsSync(dataDir)) {
-    fs.mkdirSync(dataDir, { recursive: true });
+const SOLANA_RPC = process.env.SOLANA_RPC_URL || 'https://api.mainnet-beta.solana.com';
+
+export default async function handler(req, res) {
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
   }
-  if (!fs.existsSync(DONATIONS_FILE)) {
-    fs.writeFileSync(DONATIONS_FILE, JSON.stringify({ donations: [] }));
-  }
-  if (!fs.existsSync(CAMPAIGNS_FILE)) {
-    fs.writeFileSync(CAMPAIGNS_FILE, JSON.stringify({ campaigns: [] }));
-  }
-}
 
-export default function handler(req, res) {
-  if (req.method === 'POST') {
-    try {
-      ensureDataFiles();
-      
-      const { signature, campaignId, from, to, amount, message, timestamp } = req.body;
+  try {
+    const { 
+      signature, 
+      campaignId, 
+      from, 
+      to, 
+      amount, 
+      message, 
+      timestamp 
+    } = req.body;
 
-      if (!signature || !campaignId || !from || !to || !amount) {
-        return res.status(400).json({ error: 'Missing required fields' });
-      }
-
-      // Save donation
-      const donationsData = fs.readFileSync(DONATIONS_FILE, 'utf8');
-      const { donations } = JSON.parse(donationsData);
-      
-      const newDonation = {
-        id: Date.now(),
-        signature,
-        campaignId,
-        from,
-        to,
-        amount,
-        message: message || '',
-        timestamp,
-        createdAt: new Date().toISOString(),
-        verified: false
-      };
-
-      donations.push(newDonation);
-      fs.writeFileSync(DONATIONS_FILE, JSON.stringify({ donations }, null, 2));
-
-      // Update campaign stats
-      const campaignsData = fs.readFileSync(CAMPAIGNS_FILE, 'utf8');
-      const { campaigns } = JSON.parse(campaignsData);
-      
-      const campaignIndex = campaigns.findIndex(c => c.id === campaignId);
-      if (campaignIndex !== -1) {
-        campaigns[campaignIndex].currentAmount = (campaigns[campaignIndex].currentAmount || 0) + amount;
-        campaigns[campaignIndex].supporters = (campaigns[campaignIndex].supporters || 0) + 1;
-        
-        if (!campaigns[campaignIndex].recentDonations) {
-          campaigns[campaignIndex].recentDonations = [];
-        }
-        
-        campaigns[campaignIndex].recentDonations.unshift({
-          from: from.slice(0, 8) + '...' + from.slice(-4),
-          amount,
-          message: message || '',
-          timestamp
-        });
-        
-        campaigns[campaignIndex].recentDonations = campaigns[campaignIndex].recentDonations.slice(0, 10);
-        
-        fs.writeFileSync(CAMPAIGNS_FILE, JSON.stringify({ campaigns }, null, 2));
-      }
-
-      res.status(200).json({ success: true, donation: newDonation });
-    } catch (error) {
-      console.error('Error saving donation:', error);
-      res.status(500).json({ error: 'Failed to save donation' });
+    // Validation
+    if (!signature || !campaignId || !from || !to || !amount) {
+      return res.status(400).json({ error: 'Missing required fields' });
     }
-  } else {
-    res.status(405).json({ error: 'Method not allowed' });
+
+    console.log('[SAVE-DONATION] Saving donation:', { signature, campaignId, amount });
+
+    // Verify campaign exists
+    const campaignCheck = await query(
+      'SELECT campaign_id FROM campaigns WHERE campaign_id = $1',
+      [campaignId]
+    );
+
+    if (campaignCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'Campaign not found' });
+    }
+
+    // Optional: Verify transaction on Solana
+    let verified = false;
+    try {
+      const connection = new Connection(SOLANA_RPC, 'confirmed');
+      const tx = await connection.getTransaction(signature, {
+        maxSupportedTransactionVersion: 0
+      });
+      verified = tx !== null && !tx.meta?.err;
+    } catch (verifyError) {
+      console.warn('[SAVE-DONATION] Could not verify transaction:', verifyError.message);
+    }
+
+    // Insert donation
+    const result = await query(
+      `INSERT INTO donations 
+       (campaign_id, donor_wallet, amount, transaction_signature, timestamp)
+       VALUES ($1, $2, $3, $4, $5)
+       ON CONFLICT (transaction_signature) DO NOTHING
+       RETURNING *`,
+      [campaignId, from, parseFloat(amount), signature, timestamp || new Date()]
+    );
+
+    console.log('[SAVE-DONATION] ✅ Donation saved');
+
+    res.status(200).json({ 
+      success: true, 
+      donation: result.rows[0],
+      verified,
+      message: 'Donation saved successfully' 
+    });
+
+  } catch (error) {
+    console.error('[SAVE-DONATION] Error:', error);
+    res.status(500).json({ 
+      error: error.message || 'Failed to save donation' 
+    });
   }
 }
