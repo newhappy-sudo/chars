@@ -1286,13 +1286,10 @@ function CampaignDetail({ campaign, onBack, onDonate, onRedeem, onDelete, darkMo
   );
 }
 
-// CreateCampaign - Version Debug Ultra Simple
-// Test d'affichage avant le formulaire complet
+// CreateCampaign - Version Finale Complète
+// Design exact de l'original avec styles inline garantis
 
 function CreateCampaign({ onClose, onCreate, darkMode }) {
-  console.log('[CREATE-CAMPAIGN] Component rendered!');
-  console.log('[CREATE-CAMPAIGN] darkMode:', darkMode);
-  
   const { publicKey } = useWallet();
   const [formData, setFormData] = useState({
     name: '',
@@ -1307,8 +1304,6 @@ function CreateCampaign({ onClose, onCreate, darkMode }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log('[CREATE-CAMPAIGN] Form submitted');
-    
     if (!publicKey) {
       alert('Please connect your wallet first');
       return;
@@ -1316,7 +1311,10 @@ function CreateCampaign({ onClose, onCreate, darkMode }) {
 
     const campaignId = Date.now();
     
+    console.log('[CAMPAIGN-CREATE] Starting campaign creation, ID:', campaignId);
+    
     try {
+      console.log('[CAMPAIGN-CREATE] Step 1: Creating campaign wallet...');
       const walletResponse = await fetch('/api/create-campaign-wallet', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1327,16 +1325,22 @@ function CreateCampaign({ onClose, onCreate, darkMode }) {
       });
 
       const walletData = await walletResponse.json();
+      
+      console.log('[CAMPAIGN-CREATE] Wallet API response:', walletResponse.status, walletData);
 
       if (!walletResponse.ok) {
-        alert(`Error creating campaign wallet: ${walletData.error}`);
+        console.error('[CAMPAIGN-CREATE] ❌ Wallet creation failed:', walletData);
+        alert(`Error creating campaign wallet: ${walletData.error || 'Unknown error'}. Please try again.`);
         return;
       }
       
       if (!walletData.campaignWallet) {
-        alert('Error: No wallet address returned');
+        console.error('[CAMPAIGN-CREATE] ❌ No wallet address in response:', walletData);
+        alert('Error: No wallet address returned. Please try again.');
         return;
       }
+      
+      console.log('[CAMPAIGN-CREATE] ✅ Wallet created:', walletData.campaignWallet);
 
       const newCampaign = {
         id: campaignId,
@@ -1346,31 +1350,38 @@ function CreateCampaign({ onClose, onCreate, darkMode }) {
         currentAmount: 0,
         goalAmount: parseFloat(formData.goalAmount),
         supporters: 0,
+        timeRemaining: '30 days',
+        urgent: false,
+        recentDonations: [],
         approved: false,
         fundsRedeemed: false,
         createdAt: Date.now(),
       };
+      
+      console.log('[CAMPAIGN-CREATE] Step 2: Saving campaign to database...');
 
       const response = await fetch('/api/create-campaign', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ campaign: newCampaign })
+        body: JSON.stringify(newCampaign)
       });
 
       if (response.ok) {
+        console.log('[CAMPAIGN-CREATE] ✅ Campaign created successfully:', campaignId);
         onCreate(newCampaign);
         onClose();
-        alert('Campaign submitted for approval!');
+        alert('Campaign submitted for approval! An admin will review it shortly.');
       } else {
         const errorData = await response.json();
-        alert(`Error creating campaign: ${errorData.error}`);
+        console.error('[CAMPAIGN-CREATE] ❌ Campaign save failed:', errorData);
+        alert(`Error creating campaign: ${errorData.error || 'Unknown error'}. Please try again.`);
       }
     } catch (error) {
-      alert(`Error creating campaign: ${error.message}`);
+      console.error('[CAMPAIGN-CREATE] ❌ Exception:', error);
+      alert(`Error creating campaign: ${error.message}. Please try again.`);
     }
   };
 
-  // AFFICHAGE FORCÉ AVEC Z-INDEX ULTRA-HAUT
   return (
     <div 
       style={{
@@ -1379,102 +1390,82 @@ function CreateCampaign({ onClose, onCreate, darkMode }) {
         left: 0,
         right: 0,
         bottom: 0,
-        width: '100vw',
-        height: '100vh',
-        backgroundColor: 'rgba(0, 0, 0, 0.85)',
+        background: 'rgba(0, 0, 0, 0.7)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        zIndex: 999999,
-        padding: '20px',
+        zIndex: 1000,
+        padding: '2rem',
       }} 
-      onClick={(e) => {
-        console.log('[CREATE-CAMPAIGN] Overlay clicked');
-        if (e.target === e.currentTarget) {
-          onClose();
-        }
-      }}
+      onClick={onClose}
     >
       <div 
         style={{
-          position: 'relative',
-          backgroundColor: darkMode ? '#1e293b' : '#ffffff',
+          background: darkMode ? '#1e293b' : 'white',
           color: darkMode ? '#f1f5f9' : '#1A1A1A',
           borderRadius: '24px',
           maxWidth: '500px',
           width: '100%',
           maxHeight: '90vh',
-          overflowY: 'auto',
-          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
-          zIndex: 1000000,
+          overflow: 'auto',
+          position: 'relative',
+          boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
         }} 
-        onClick={(e) => e.stopPropagation()}
+        onClick={(e) => e.stopPropagation()} 
+        className="modal"
       >
-        {/* Close Button */}
         <button 
-          onClick={() => {
-            console.log('[CREATE-CAMPAIGN] Close button clicked');
-            onClose();
-          }}
-          type="button"
+          onClick={onClose} 
           style={{
             position: 'absolute',
-            top: '20px',
-            right: '20px',
+            top: '1.5rem',
+            right: '1.5rem',
+            background: darkMode ? '#334155' : '#F5F1ED',
+            border: 'none',
             width: '40px',
             height: '40px',
             borderRadius: '50%',
-            border: 'none',
-            backgroundColor: darkMode ? '#334155' : '#F5F1ED',
-            color: darkMode ? '#cbd5e1' : '#666',
-            fontSize: '24px',
+            fontSize: '1.5rem',
             cursor: 'pointer',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
+            transition: 'all 0.3s',
+            color: darkMode ? '#cbd5e1' : '#666',
             zIndex: 10,
-            lineHeight: '1',
-          }}
+          }} 
+          className="close-btn"
         >
           ✕
         </button>
         
-        {/* Header */}
         <div style={{
-          padding: '48px 32px 24px',
+          padding: '3rem 2rem 1.5rem',
           textAlign: 'center',
           borderBottom: `1px solid ${darkMode ? '#334155' : '#F0EBE6'}`,
         }}>
           <h2 style={{
-            fontSize: '28px',
+            fontFamily: "'Google Sans', sans-serif",
+            fontSize: '1.75rem',
             fontWeight: '700',
-            marginBottom: '8px',
             color: darkMode ? '#f1f5f9' : '#1A1A1A',
-          }}>
-            Create a Campaign
-          </h2>
+            marginBottom: '0.5rem',
+          }}>Create a Campaign</h2>
           <p style={{
-            fontSize: '15px',
+            fontSize: '0.9375rem',
             color: darkMode ? '#cbd5e1' : '#666',
-          }}>
-            Share your project with the community
-          </p>
+          }}>Share your project with the community</p>
         </div>
         
-        {/* Form */}
-        <form onSubmit={handleSubmit} style={{ padding: '32px' }}>
-          
-          {/* Name */}
-          <div style={{ marginBottom: '24px' }}>
+        <form onSubmit={handleSubmit} style={{ padding: '2rem' }}>
+          <div style={{ marginBottom: '1.5rem' }}>
             <label style={{
               display: 'block',
-              marginBottom: '8px',
+              marginBottom: '0.5rem',
               fontWeight: '600',
-              fontSize: '14px',
               color: darkMode ? '#f1f5f9' : '#1A1A1A',
-            }}>
-              Name *
-            </label>
+              fontSize: '0.875rem',
+            }}>Name *</label>
             <input
               type="text"
               value={formData.name}
@@ -1483,40 +1474,39 @@ function CreateCampaign({ onClose, onCreate, darkMode }) {
               required
               style={{
                 width: '100%',
-                padding: '16px',
-                borderRadius: '12px',
+                padding: '1rem',
                 border: `2px solid ${darkMode ? '#4b5563' : '#E0E0E0'}`,
-                fontSize: '16px',
-                backgroundColor: darkMode ? '#334155' : 'white',
+                borderRadius: '12px',
+                fontSize: '1rem',
+                transition: 'all 0.3s',
+                fontFamily: 'inherit',
+                background: darkMode ? '#334155' : 'white',
                 color: darkMode ? '#f1f5f9' : '#1A1A1A',
-                outline: 'none',
               }}
             />
           </div>
 
-          {/* Type */}
-          <div style={{ marginBottom: '24px' }}>
+          <div style={{ marginBottom: '1.5rem' }}>
             <label style={{
               display: 'block',
-              marginBottom: '8px',
+              marginBottom: '0.5rem',
               fontWeight: '600',
-              fontSize: '14px',
               color: darkMode ? '#f1f5f9' : '#1A1A1A',
-            }}>
-              Type *
-            </label>
+              fontSize: '0.875rem',
+            }}>Type *</label>
             <select
               value={formData.type}
               onChange={(e) => setFormData({...formData, type: e.target.value})}
               style={{
                 width: '100%',
-                padding: '16px',
-                borderRadius: '12px',
+                padding: '1rem',
                 border: `2px solid ${darkMode ? '#4b5563' : '#E0E0E0'}`,
-                fontSize: '16px',
-                backgroundColor: darkMode ? '#334155' : 'white',
+                borderRadius: '12px',
+                fontSize: '1rem',
+                transition: 'all 0.3s',
+                fontFamily: 'inherit',
+                background: darkMode ? '#334155' : 'white',
                 color: darkMode ? '#f1f5f9' : '#1A1A1A',
-                outline: 'none',
               }}
             >
               <option value="person">Person</option>
@@ -1524,17 +1514,14 @@ function CreateCampaign({ onClose, onCreate, darkMode }) {
             </select>
           </div>
 
-          {/* Photo URL */}
-          <div style={{ marginBottom: '24px' }}>
+          <div style={{ marginBottom: '1.5rem' }}>
             <label style={{
               display: 'block',
-              marginBottom: '8px',
+              marginBottom: '0.5rem',
               fontWeight: '600',
-              fontSize: '14px',
               color: darkMode ? '#f1f5f9' : '#1A1A1A',
-            }}>
-              Photo URL *
-            </label>
+              fontSize: '0.875rem',
+            }}>Photo URL *</label>
             <input
               type="url"
               value={formData.image}
@@ -1543,68 +1530,62 @@ function CreateCampaign({ onClose, onCreate, darkMode }) {
               required
               style={{
                 width: '100%',
-                padding: '16px',
-                borderRadius: '12px',
+                padding: '1rem',
                 border: `2px solid ${darkMode ? '#4b5563' : '#E0E0E0'}`,
-                fontSize: '16px',
-                backgroundColor: darkMode ? '#334155' : 'white',
+                borderRadius: '12px',
+                fontSize: '1rem',
+                transition: 'all 0.3s',
+                fontFamily: 'inherit',
+                background: darkMode ? '#334155' : 'white',
                 color: darkMode ? '#f1f5f9' : '#1A1A1A',
-                outline: 'none',
               }}
             />
             <span style={{
-              fontSize: '12px',
+              fontSize: '0.75rem',
               color: darkMode ? '#94a3b8' : '#999',
-              marginTop: '8px',
+              marginTop: '0.5rem',
               display: 'block',
-            }}>
-              Link to your profile photo
-            </span>
+            }}>Link to your profile photo</span>
           </div>
 
-          {/* Description */}
-          <div style={{ marginBottom: '24px' }}>
+          <div style={{ marginBottom: '1.5rem' }}>
             <label style={{
               display: 'block',
-              marginBottom: '8px',
+              marginBottom: '0.5rem',
               fontWeight: '600',
-              fontSize: '14px',
               color: darkMode ? '#f1f5f9' : '#1A1A1A',
-            }}>
-              Description *
-            </label>
+              fontSize: '0.875rem',
+            }}>Description *</label>
             <textarea
               value={formData.description}
               onChange={(e) => setFormData({...formData, description: e.target.value})}
               placeholder="Describe your project..."
               required
-              rows={4}
+              rows="4"
               style={{
                 width: '100%',
-                padding: '16px',
-                borderRadius: '12px',
+                padding: '1rem',
                 border: `2px solid ${darkMode ? '#4b5563' : '#E0E0E0'}`,
-                fontSize: '16px',
-                backgroundColor: darkMode ? '#334155' : 'white',
-                color: darkMode ? '#f1f5f9' : '#1A1A1A',
-                outline: 'none',
+                borderRadius: '12px',
+                fontSize: '1rem',
+                minHeight: '100px',
                 resize: 'vertical',
                 fontFamily: 'inherit',
+                transition: 'all 0.3s',
+                background: darkMode ? '#334155' : 'white',
+                color: darkMode ? '#f1f5f9' : '#1A1A1A',
               }}
             />
           </div>
 
-          {/* Goal */}
-          <div style={{ marginBottom: '24px' }}>
+          <div style={{ marginBottom: '1.5rem' }}>
             <label style={{
               display: 'block',
-              marginBottom: '8px',
+              marginBottom: '0.5rem',
               fontWeight: '600',
-              fontSize: '14px',
               color: darkMode ? '#f1f5f9' : '#1A1A1A',
-            }}>
-              Goal (SOL) *
-            </label>
+              fontSize: '0.875rem',
+            }}>Goal (SOL) *</label>
             <input
               type="number"
               step="0.1"
@@ -1615,48 +1596,42 @@ function CreateCampaign({ onClose, onCreate, darkMode }) {
               required
               style={{
                 width: '100%',
-                padding: '16px',
-                borderRadius: '12px',
+                padding: '1rem',
                 border: `2px solid ${darkMode ? '#4b5563' : '#E0E0E0'}`,
-                fontSize: '16px',
-                backgroundColor: darkMode ? '#334155' : 'white',
+                borderRadius: '12px',
+                fontSize: '1rem',
+                transition: 'all 0.3s',
+                fontFamily: 'inherit',
+                background: darkMode ? '#334155' : 'white',
                 color: darkMode ? '#f1f5f9' : '#1A1A1A',
-                outline: 'none',
               }}
             />
           </div>
 
-          {/* Social Links Label */}
-          <div style={{ marginBottom: '16px' }}>
+          <div style={{ marginBottom: '1.5rem' }}>
             <label style={{
               display: 'block',
+              marginBottom: '0.5rem',
               fontWeight: '600',
-              fontSize: '14px',
               color: darkMode ? '#f1f5f9' : '#1A1A1A',
-            }}>
-              Social Links (optional)
-            </label>
+              fontSize: '0.875rem',
+            }}>Social Links (optional)</label>
             <span style={{
-              fontSize: '12px',
+              fontSize: '0.75rem',
               color: darkMode ? '#94a3b8' : '#999',
-              marginTop: '4px',
+              marginBottom: '0.5rem',
               display: 'block',
-            }}>
-              Add your social media links
-            </span>
+            }}>Add your social media links</span>
           </div>
 
-          {/* Twitter */}
-          <div style={{ marginBottom: '16px' }}>
+          <div style={{ marginBottom: '1.5rem' }}>
             <label style={{
               display: 'block',
-              marginBottom: '8px',
+              marginBottom: '0.5rem',
               fontWeight: '600',
-              fontSize: '14px',
               color: darkMode ? '#f1f5f9' : '#1A1A1A',
-            }}>
-              <i className="bi bi-twitter-x"></i> Twitter / X
-            </label>
+              fontSize: '0.875rem',
+            }}><i className="bi bi-twitter-x"></i> Twitter / X</label>
             <input
               type="url"
               value={formData.twitter}
@@ -1664,28 +1639,26 @@ function CreateCampaign({ onClose, onCreate, darkMode }) {
               placeholder="https://twitter.com/username"
               style={{
                 width: '100%',
-                padding: '16px',
-                borderRadius: '12px',
+                padding: '1rem',
                 border: `2px solid ${darkMode ? '#4b5563' : '#E0E0E0'}`,
-                fontSize: '16px',
-                backgroundColor: darkMode ? '#334155' : 'white',
+                borderRadius: '12px',
+                fontSize: '1rem',
+                transition: 'all 0.3s',
+                fontFamily: 'inherit',
+                background: darkMode ? '#334155' : 'white',
                 color: darkMode ? '#f1f5f9' : '#1A1A1A',
-                outline: 'none',
               }}
             />
           </div>
 
-          {/* Telegram */}
-          <div style={{ marginBottom: '16px' }}>
+          <div style={{ marginBottom: '1.5rem' }}>
             <label style={{
               display: 'block',
-              marginBottom: '8px',
+              marginBottom: '0.5rem',
               fontWeight: '600',
-              fontSize: '14px',
               color: darkMode ? '#f1f5f9' : '#1A1A1A',
-            }}>
-              <i className="bi bi-telegram"></i> Telegram
-            </label>
+              fontSize: '0.875rem',
+            }}><i className="bi bi-telegram"></i> Telegram</label>
             <input
               type="url"
               value={formData.telegram}
@@ -1693,28 +1666,26 @@ function CreateCampaign({ onClose, onCreate, darkMode }) {
               placeholder="https://t.me/username"
               style={{
                 width: '100%',
-                padding: '16px',
-                borderRadius: '12px',
+                padding: '1rem',
                 border: `2px solid ${darkMode ? '#4b5563' : '#E0E0E0'}`,
-                fontSize: '16px',
-                backgroundColor: darkMode ? '#334155' : 'white',
+                borderRadius: '12px',
+                fontSize: '1rem',
+                transition: 'all 0.3s',
+                fontFamily: 'inherit',
+                background: darkMode ? '#334155' : 'white',
                 color: darkMode ? '#f1f5f9' : '#1A1A1A',
-                outline: 'none',
               }}
             />
           </div>
 
-          {/* Website */}
-          <div style={{ marginBottom: '24px' }}>
+          <div style={{ marginBottom: '1.5rem' }}>
             <label style={{
               display: 'block',
-              marginBottom: '8px',
+              marginBottom: '0.5rem',
               fontWeight: '600',
-              fontSize: '14px',
               color: darkMode ? '#f1f5f9' : '#1A1A1A',
-            }}>
-              <i className="bi bi-globe"></i> Website
-            </label>
+              fontSize: '0.875rem',
+            }}><i className="bi bi-globe"></i> Website</label>
             <input
               type="url"
               value={formData.website}
@@ -1722,61 +1693,61 @@ function CreateCampaign({ onClose, onCreate, darkMode }) {
               placeholder="https://example.com"
               style={{
                 width: '100%',
-                padding: '16px',
-                borderRadius: '12px',
+                padding: '1rem',
                 border: `2px solid ${darkMode ? '#4b5563' : '#E0E0E0'}`,
-                fontSize: '16px',
-                backgroundColor: darkMode ? '#334155' : 'white',
+                borderRadius: '12px',
+                fontSize: '1rem',
+                transition: 'all 0.3s',
+                fontFamily: 'inherit',
+                background: darkMode ? '#334155' : 'white',
                 color: darkMode ? '#f1f5f9' : '#1A1A1A',
-                outline: 'none',
               }}
             />
           </div>
 
-          {/* Warning if wallet not connected */}
           {!publicKey && (
             <div style={{
-              padding: '16px',
-              backgroundColor: darkMode ? '#334155' : '#FEF3C7',
+              padding: '1rem',
+              background: darkMode ? '#334155' : '#FEF3C7',
               borderRadius: '10px',
-              marginBottom: '16px',
+              marginBottom: '1rem',
               textAlign: 'center',
               fontWeight: '600',
               color: darkMode ? '#fbbf24' : '#92400E',
-              fontSize: '14px',
+              fontSize: '0.875rem',
             }}>
               Connect your wallet to create a campaign
             </div>
           )}
 
-          {/* Submit Button */}
-          <button
-            type="submit"
-            disabled={!publicKey}
+          <button 
+            type="submit" 
+            disabled={!publicKey} 
             style={{
               width: '100%',
-              padding: '16px',
-              backgroundColor: publicKey ? '#7c3aed' : '#9ca3af',
+              padding: '1rem',
+              background: '#7c3aed',
               color: 'white',
               border: 'none',
               borderRadius: '12px',
-              fontSize: '16px',
+              fontSize: '1rem',
               fontWeight: '600',
-              cursor: publicKey ? 'pointer' : 'not-allowed',
+              cursor: 'pointer',
               transition: 'all 0.3s',
-            }}
+              opacity: publicKey ? 1 : 0.5,
+            }} 
+            className="submit-btn"
           >
             Submit Campaign
           </button>
           
           <p style={{
-            fontSize: '12px',
+            fontSize: '0.75rem',
             color: darkMode ? '#94a3b8' : '#999',
-            marginTop: '16px',
+            marginTop: '0.5rem',
+            display: 'block',
             textAlign: 'center',
-          }}>
-            Your campaign will be reviewed by an admin before going live.
-          </p>
+          }}>Your campaign will be reviewed by an admin before going live.</p>
         </form>
       </div>
     </div>
